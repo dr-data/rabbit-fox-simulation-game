@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "rabbit-fox-simulation-game",
   "compatibility_date": "2026-08-17",
+  "main": "src/worker.ts",
   "observability": {
     "enabled": true
   },
