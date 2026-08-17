@@ -4,13 +4,18 @@
  */
 
 import React from 'react';
-import { Keyboard } from 'lucide-react';
+import { Keyboard, Settings } from 'lucide-react';
+import { SoundEngine } from '../utils/soundSynthesizer';
 
 interface ControlsFooterProps {
   isLightMode?: boolean;
+  onOpenSettings?: () => void;
 }
 
-export const ControlsFooter: React.FC<ControlsFooterProps> = ({ isLightMode = false }) => {
+export const ControlsFooter: React.FC<ControlsFooterProps> = ({ 
+  isLightMode = false,
+  onOpenSettings,
+}) => {
   return (
     <footer
       className={`border-t px-3 py-2 text-[11px] font-mono select-none transition-colors ${
@@ -86,12 +91,39 @@ export const ControlsFooter: React.FC<ControlsFooterProps> = ({ isLightMode = fa
             </kbd>{' '}
             Speed
           </span>
+          <span>
+            <kbd className={`px-1.5 py-0.5 rounded border font-bold ${
+              isLightMode ? 'bg-slate-100 border-slate-300 text-slate-800' : 'bg-zinc-800 border-zinc-700 text-emerald-300'
+            }`}>
+              O
+            </kbd>{' '}
+            UI Settings
+          </span>
         </div>
 
-        <div className={`hidden xl:inline ${isLightMode ? 'text-slate-400' : 'text-zinc-600'}`}>
-          Model: Extended Lotka-Volterra RK4
+        <div className="flex items-center gap-2">
+          {onOpenSettings && (
+            <button
+              onClick={() => {
+                SoundEngine.playClick();
+                onOpenSettings();
+              }}
+              className={`px-2 py-0.5 rounded border flex items-center gap-1 cursor-pointer transition text-[10px] font-bold ${
+                isLightMode
+                  ? 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  : 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
+              }`}
+            >
+              <Settings className="w-3 h-3 text-emerald-500" />
+              <span>UI Settings</span>
+            </button>
+          )}
+          <div className={`hidden xl:inline ${isLightMode ? 'text-slate-400' : 'text-zinc-600'}`}>
+            Model: Extended Lotka-Volterra RK4
+          </div>
         </div>
       </div>
     </footer>
   );
 };
+

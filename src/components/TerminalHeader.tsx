@@ -20,6 +20,7 @@ import {
   Moon,
   StepForward,
   Sparkles,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 
 interface TerminalHeaderProps {
@@ -37,6 +38,7 @@ interface TerminalHeaderProps {
   isMuted: boolean;
   theme: ColorTheme;
   fps: number;
+  showFpsCounter?: boolean;
   isLightMode: boolean;
   onTogglePause: () => void;
   onStepForward: () => void;
@@ -48,6 +50,7 @@ interface TerminalHeaderProps {
   onToggleLightDark: () => void;
   onOpenChallenges: () => void;
   onOpenMathHelp: () => void;
+  onOpenSettings: () => void;
 }
 
 export const TerminalHeader: React.FC<TerminalHeaderProps> = ({
@@ -65,6 +68,7 @@ export const TerminalHeader: React.FC<TerminalHeaderProps> = ({
   isMuted,
   theme,
   fps,
+  showFpsCounter = true,
   isLightMode,
   onTogglePause,
   onStepForward,
@@ -76,6 +80,7 @@ export const TerminalHeader: React.FC<TerminalHeaderProps> = ({
   onToggleLightDark,
   onOpenChallenges,
   onOpenMathHelp,
+  onOpenSettings,
 }) => {
   const getSeasonIcon = () => {
     switch (season) {
@@ -160,14 +165,16 @@ export const TerminalHeader: React.FC<TerminalHeaderProps> = ({
           </div>
 
           {/* FPS */}
-          <div
-            className={`hidden lg:flex items-center gap-1 px-2 py-0.5 rounded border text-zinc-500 ${
-              isLightMode ? 'bg-slate-100 border-slate-300' : 'bg-zinc-900/80 border-zinc-800'
-            }`}
-          >
-            <span>FPS:</span>
-            <span className="text-emerald-500 font-bold">{fps}</span>
-          </div>
+          {showFpsCounter && (
+            <div
+              className={`hidden lg:flex items-center gap-1 px-2 py-0.5 rounded border text-zinc-500 ${
+                isLightMode ? 'bg-slate-100 border-slate-300' : 'bg-zinc-900/80 border-zinc-800'
+              }`}
+            >
+              <span>FPS:</span>
+              <span className="text-emerald-500 font-bold">{fps}</span>
+            </div>
+          )}
 
           {/* 1-Click Light / Dark Mode Toggle */}
           <button
@@ -262,6 +269,23 @@ export const TerminalHeader: React.FC<TerminalHeaderProps> = ({
           >
             <HelpCircle className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">MATH [H]</span>
+          </button>
+
+          {/* Settings Modal Toggle */}
+          <button
+            onClick={() => {
+              SoundEngine.playClick();
+              onOpenSettings();
+            }}
+            className={`px-2 py-0.5 rounded border flex items-center gap-1 cursor-pointer transition ${
+              isLightMode
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold'
+                : 'bg-emerald-950/60 border-emerald-700 text-emerald-300 hover:bg-emerald-900/60 font-bold'
+            }`}
+            title="Configure Default UI Style & Display Settings [O]"
+          >
+            <SettingsIcon className="w-3.5 h-3.5 text-emerald-500" />
+            <span className="hidden sm:inline">SETTINGS [O]</span>
           </button>
         </div>
       </div>

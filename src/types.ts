@@ -156,3 +156,17 @@ export type ColorTheme =
 export type PlotViewMode = 'visual_chart' | 'phase_portrait' | 'cycle_explainer' | 'timeseries' | 'math_inspector';
 
 export type GridRenderMode = 'graphic' | 'ascii';
+
+export type ParticleDensity = 'high' | 'medium' | 'low';
+
+export interface UISettings {
+  defaultTheme: ColorTheme;
+  defaultViewMode: PlotViewMode;
+  defaultGridRenderMode: GridRenderMode;
+  defaultTimeSpeed: number;
+  crtEnabled: boolean;
+  soundEnabled: boolean;
+  showFpsCounter: boolean;
+  particleDensity: ParticleDensity;
+  autoSaveOnChange: boolean;
+}

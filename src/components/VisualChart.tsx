@@ -69,11 +69,13 @@ export const VisualChart: React.FC<VisualChartProps> = ({
     return history.filter((pt) => pt.day >= effectiveStartDay && pt.day <= effectiveEndDay);
   }, [history, timeWindow, windowEndDay, effectiveStartDay, effectiveEndDay]);
 
-  // Events present in current visible window
+  // Events present in current visible window (deduplicated by id)
   const visibleEvents = useMemo(() => {
+    const seen = new Set<string>();
     const evs: TimelineEventMarker[] = [];
     displayHistory.forEach((pt) => {
-      if (pt.eventDetails) {
+      if (pt.eventDetails && !seen.has(pt.eventDetails.id)) {
+        seen.add(pt.eventDetails.id);
         evs.push(pt.eventDetails);
       }
     });
@@ -217,14 +219,20 @@ export const VisualChart: React.FC<VisualChartProps> = ({
 
   const hoveredData = hoverIndex !== null && displayHistory[hoverIndex] ? displayHistory[hoverIndex] : null;
 
-  // Y-axis ticks
-  const yTicks = [0, Math.round(maxPop * 0.25), Math.round(maxPop * 0.5), Math.round(maxPop * 0.75), maxPop];
+  // Y-axis ticks (strictly unique)
+  const yTicks = useMemo(() => {
+    const raw = [0, Math.round(maxPop * 0.25), Math.round(maxPop * 0.5), Math.round(maxPop * 0.75), maxPop];
+    return Array.from(new Set(raw)).sort((a, b) => a - b);
+  }, [maxPop]);
 
-  // X-axis ticks (approx 5 ticks)
+  // X-axis ticks (approx 5 ticks, strictly unique)
   const xTicks = useMemo(() => {
     const count = 5;
-    const step = (maxT - minT) / count;
-    return Array.from({ length: count + 1 }, (_, i) => Math.round(minT + i * step));
+    const diff = maxT - minT;
+    if (diff <= 0) return [Math.round(minT)];
+    const step = diff / count;
+    const raw = Array.from({ length: count + 1 }, (_, i) => Math.round(minT + i * step));
+    return Array.from(new Set(raw)).sort((a, b) => a - b);
   }, [minT, maxT]);
 
   return (
@@ -552,10 +560,10 @@ export const VisualChart: React.FC<VisualChartProps> = ({
           </defs>
 
           {/* Background Grid Lines */}
-          {yTicks.map((val) => {
+          {yTicks.map((val, idx) => {
             const y = getY(val);
             return (
-              <g key={`y-${val}`}>
+              <g key={`y-tick-${val}-${idx}`}>
                 <line
                   x1={padding.left}
                   y1={y}
@@ -580,10 +588,10 @@ export const VisualChart: React.FC<VisualChartProps> = ({
           })}
 
           {/* X Axis Ticks */}
-          {xTicks.map((val) => {
+          {xTicks.map((val, idx) => {
             const x = getX(val);
             return (
-              <g key={`x-${val}`}>
+              <g key={`x-tick-${val}-${idx}`}>
                 <line
                   x1={x}
                   y1={padding.top}
@@ -699,12 +707,12 @@ export const VisualChart: React.FC<VisualChartProps> = ({
 
           {/* EVENT TRIGGER & RELIEF MARKERS */}
           {showEventMarkers &&
-            visibleEvents.map((ev) => {
+            visibleEvents.map((ev, idx) => {
               const x = getX(ev.t);
               const isHovered = hoveredEvent?.id === ev.id;
               return (
                 <g 
-                  key={ev.id} 
+                  key={`event-pin-${ev.id}-${idx}`} 
                   className="cursor-pointer"
                   onMouseEnter={() => setHoveredEvent(ev)}
                 >
@@ -907,9 +915,9 @@ export const VisualChart: React.FC<VisualChartProps> = ({
             <AlertCircle className="w-3 h-3 text-cyan-400" />
             Events in Window:
           </span>
-          {visibleEvents.map((ev) => (
+          {visibleEvents.map((ev, idx) => (
             <button
-              key={ev.id}
+              key={`event-btn-${ev.id}-${idx}`}
               onClick={() => {
                 SoundEngine.playClick();
                 setHoveredEvent(ev);

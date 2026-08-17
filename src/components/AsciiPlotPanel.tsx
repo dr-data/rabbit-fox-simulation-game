@@ -71,11 +71,13 @@ export const AsciiPlotPanel: React.FC<AsciiPlotPanelProps> = ({
     return filtered.slice(-asciiWidth);
   }, [history, asciiEndDay, effectiveEndDay]);
 
-  // Events present in current visible ASCII slice
+  // Events present in current visible ASCII slice (deduplicated by id)
   const visibleAsciiEvents = useMemo(() => {
+    const seen = new Set<string>();
     const evs: TimelineEventMarker[] = [];
     visibleAsciiPoints.forEach((pt) => {
-      if (pt.eventDetails) {
+      if (pt.eventDetails && !seen.has(pt.eventDetails.id)) {
+        seen.add(pt.eventDetails.id);
         evs.push(pt.eventDetails);
       }
     });
@@ -416,9 +418,9 @@ export const AsciiPlotPanel: React.FC<AsciiPlotPanelProps> = ({
                     <AlertCircle className="w-3 h-3 text-cyan-400" />
                     Events:
                   </span>
-                  {visibleAsciiEvents.map((ev) => (
+                  {visibleAsciiEvents.map((ev, idx) => (
                     <span
-                      key={ev.id}
+                      key={`ascii-ev-${ev.id}-${idx}`}
                       className="px-1.5 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1"
                       style={{
                         backgroundColor: isLightMode ? '#f8fafc' : '#18181b',

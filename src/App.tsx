@@ -12,16 +12,19 @@ import {
   GridRenderMode,
   HistoryPoint,
   Particle,
+  ParticleDensity,
   PlotViewMode,
   SimEvent,
   SimParameters,
   Species,
   TimelineEventMarker,
+  UISettings,
 } from './types';
 import { PRESET_MODELS } from './data/presets';
 import { GAME_CHALLENGES } from './data/challenges';
 import { calculateEquilibrium, calculateSeasonality, rk4Step, updateSpatialGrid } from './utils/mathEngine';
 import { SoundEngine } from './utils/soundSynthesizer';
+import { loadUISettings, saveUISettings, resetUISettings } from './utils/settingsStorage';
 import { TerminalHeader } from './components/TerminalHeader';
 import { EcosystemGrid } from './components/EcosystemGrid';
 import { AsciiPlotPanel } from './components/AsciiPlotPanel';
@@ -29,9 +32,13 @@ import { ParameterPanel } from './components/ParameterPanel';
 import { EventDeck } from './components/EventDeck';
 import { ChallengeModal } from './components/ChallengeModal';
 import { MathHelpModal } from './components/MathHelpModal';
+import { SettingsModal } from './components/SettingsModal';
 import { ControlsFooter } from './components/ControlsFooter';
 
 export default function App() {
+  // Load persisted default UI style preferences
+  const initialSettings = loadUISettings();
+
   // 1. Simulation Mathematical Parameters
   const [params, setParams] = useState<SimParameters>(PRESET_MODELS[0].params);
   const [selectedParamIndex, setSelectedParamIndex] = useState<number>(0);
@@ -42,7 +49,7 @@ export default function App() {
   const [foxes, setFoxes] = useState<number>(PRESET_MODELS[0].initial.foxes);
   const [wolves, setWolves] = useState<number>(PRESET_MODELS[0].initial.wolves);
   const [isPaused, setIsPaused] = useState<boolean>(false);
-  const [timeSpeed, setTimeSpeed] = useState<number>(1);
+  const [timeSpeed, setTimeSpeed] = useState<number>(initialSettings.defaultTimeSpeed || 1);
   const [fps, setFps] = useState<number>(30);
 
   // 3. History timeline for charts
@@ -58,17 +65,25 @@ export default function App() {
   const [challengeStatus, setChallengeStatus] = useState<'idle' | 'playing' | 'won' | 'lost'>('idle');
   const [challengeFailureReason, setChallengeFailureReason] = useState<string>('');
 
-  // 6. Visual Settings & UI state
-  const [viewMode, setViewMode] = useState<PlotViewMode>('visual_chart');
-  const [gridRenderMode, setGridRenderMode] = useState<GridRenderMode>('graphic');
-  const [theme, setTheme] = useState<ColorTheme>('phosphor-green');
-  const [crtEnabled, setCrtEnabled] = useState<boolean>(true);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
+  // 6. Visual Settings & UI state (Initialized with loaded user preferences)
+  const [uiSettings, setUiSettings] = useState<UISettings>(initialSettings);
+  const [viewMode, setViewMode] = useState<PlotViewMode>(initialSettings.defaultViewMode || 'visual_chart');
+  const [gridRenderMode, setGridRenderMode] = useState<GridRenderMode>(initialSettings.defaultGridRenderMode || 'graphic');
+  const [theme, setTheme] = useState<ColorTheme>(initialSettings.defaultTheme || 'phosphor-green');
+  const [crtEnabled, setCrtEnabled] = useState<boolean>(initialSettings.crtEnabled ?? true);
+  const [isMuted, setIsMuted] = useState<boolean>(!initialSettings.soundEnabled);
+  const [showFpsCounter, setShowFpsCounter] = useState<boolean>(initialSettings.showFpsCounter ?? true);
+  const [particleDensity, setParticleDensity] = useState<ParticleDensity>(initialSettings.particleDensity || 'high');
   const [hasDisease, setHasDisease] = useState<boolean>(false);
   const [diseaseTimer, setDiseaseTimer] = useState<number>(0);
 
   // Derive light mode flag
   const isLightMode = theme.startsWith('light-');
+
+  // Initialize sound engine mute state
+  useEffect(() => {
+    SoundEngine.setMuted(!initialSettings.soundEnabled);
+  }, []);
 
   // 7. Event Logs
   const [events, setEvents] = useState<SimEvent[]>([
@@ -84,6 +99,7 @@ export default function App() {
   // 8. Modals
   const [isChallengeModalOpen, setIsChallengeModalOpen] = useState<boolean>(false);
   const [isMathHelpOpen, setIsMathHelpOpen] = useState<boolean>(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   // Stable references for requestAnimationFrame loop
   const simRef = useRef({
@@ -491,6 +507,31 @@ export default function App() {
     setParams((prev) => ({ ...prev, [key]: value }));
   };
 
+  // UI Settings Management Handlers
+  const handleApplySettings = (nextSettings: UISettings, savePermanent: boolean) => {
+    setUiSettings(nextSettings);
+    setTheme(nextSettings.defaultTheme);
+    setViewMode(nextSettings.defaultViewMode);
+    setGridRenderMode(nextSettings.defaultGridRenderMode);
+    setTimeSpeed(nextSettings.defaultTimeSpeed);
+    setCrtEnabled(nextSettings.crtEnabled);
+    setIsMuted(!nextSettings.soundEnabled);
+    SoundEngine.setMuted(!nextSettings.soundEnabled);
+    setShowFpsCounter(nextSettings.showFpsCounter);
+    setParticleDensity(nextSettings.particleDensity);
+
+    if (savePermanent) {
+      saveUISettings(nextSettings);
+      addEventLog('Default UI style preferences saved to browser storage.', 'info');
+    }
+  };
+
+  const handleResetSettingsDefaults = () => {
+    const defaults = resetUISettings();
+    handleApplySettings(defaults, true);
+    addEventLog('UI style preferences reset to factory defaults.', 'info');
+  };
+
   // Main Simulation Loop
   useEffect(() => {
     let frameCount = 0;
@@ -698,6 +739,12 @@ export default function App() {
           SoundEngine.playClick();
           setIsMathHelpOpen((o) => !o);
           break;
+        case 'KeyO':
+        case 'KeyP':
+          e.preventDefault();
+          SoundEngine.playClick();
+          setIsSettingsOpen((o) => !o);
+          break;
         case 'KeyS':
           e.preventDefault();
           SoundEngine.playClick();
@@ -741,6 +788,7 @@ export default function App() {
         case 'Escape':
           setIsChallengeModalOpen(false);
           setIsMathHelpOpen(false);
+          setIsSettingsOpen(false);
           break;
       }
     };
@@ -801,17 +849,30 @@ export default function App() {
         isMuted={isMuted}
         theme={theme}
         fps={fps}
+        showFpsCounter={showFpsCounter}
         isLightMode={isLightMode}
         onTogglePause={() => setIsPaused((p) => !p)}
         onStepForward={handleStepForward}
         onCycleSpeed={() => setTimeSpeed((s) => (s === 1 ? 2 : s === 2 ? 5 : s === 5 ? 0.5 : 1))}
         onReset={handleReset}
         onToggleCrt={() => setCrtEnabled((c) => !c)}
-        onToggleMute={() => setIsMuted(SoundEngine.toggleMute())}
-        onChangeTheme={(th) => setTheme(th)}
+        onToggleMute={() => {
+          const nextMute = SoundEngine.toggleMute();
+          setIsMuted(nextMute);
+          setUiSettings((prev) => ({ ...prev, soundEnabled: !nextMute }));
+        }}
+        onChangeTheme={(th) => {
+          setTheme(th);
+          setUiSettings((prev) => {
+            const next = { ...prev, defaultTheme: th };
+            if (prev.autoSaveOnChange) saveUISettings(next);
+            return next;
+          });
+        }}
         onToggleLightDark={handleToggleLightDark}
         onOpenChallenges={() => setIsChallengeModalOpen(true)}
         onOpenMathHelp={() => setIsMathHelpOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       {/* Main Content Multi-Panel HUD Layout */}
@@ -830,7 +891,14 @@ export default function App() {
             hasDisease={hasDisease}
             isLightMode={isLightMode}
             renderMode={gridRenderMode}
-            onChangeRenderMode={(m) => setGridRenderMode(m)}
+            onChangeRenderMode={(m) => {
+              setGridRenderMode(m);
+              setUiSettings((prev) => {
+                const next = { ...prev, defaultGridRenderMode: m };
+                if (prev.autoSaveOnChange) saveUISettings(next);
+                return next;
+              });
+            }}
             onSpawnAgent={handleSpawnAgent}
             onDropCarrots={handleDropCarrots}
           />
@@ -854,7 +922,14 @@ export default function App() {
             params={params}
             viewMode={viewMode}
             isLightMode={isLightMode}
-            onSetViewMode={(m) => setViewMode(m)}
+            onSetViewMode={(m) => {
+              setViewMode(m);
+              setUiSettings((prev) => {
+                const next = { ...prev, defaultViewMode: m };
+                if (prev.autoSaveOnChange) saveUISettings(next);
+                return next;
+              });
+            }}
           />
           <ParameterPanel
             params={params}
@@ -869,7 +944,10 @@ export default function App() {
       </main>
 
       {/* Bottom Footer & Hotkey legend */}
-      <ControlsFooter isLightMode={isLightMode} />
+      <ControlsFooter 
+        isLightMode={isLightMode} 
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
 
       {/* Modals */}
       <ChallengeModal
@@ -898,6 +976,16 @@ export default function App() {
         isOpen={isMathHelpOpen}
         isLightMode={isLightMode}
         onClose={() => setIsMathHelpOpen(false)}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        isLightMode={isLightMode}
+        currentSettings={uiSettings}
+        onClose={() => setIsSettingsOpen(false)}
+        onApplySettings={handleApplySettings}
+        onResetDefaults={handleResetSettingsDefaults}
       />
     </div>
   );
