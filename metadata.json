@@ -1,0 +1,6 @@
+{
+  "name": "Lotka-Volterra Predator-Prey Terminal Sim",
+  "description": "Retro terminal ASCII ecosystem simulation game exploring Lotka-Volterra predator-prey dynamics with real-time ODE math, animations, particle effects, and challenges.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

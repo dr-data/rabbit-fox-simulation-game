@@ -1,0 +1,446 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState } from 'react';
+import { GridAgent, GridRenderMode, Particle, Season, Species } from '../types';
+import { SoundEngine } from '../utils/soundSynthesizer';
+import { Sparkles, Skull, Crosshair, Grid, Monitor, Eye } from 'lucide-react';
+
+interface EcosystemGridProps {
+  agents: GridAgent[];
+  particles: Particle[];
+  season: Season;
+  gridWidth?: number;
+  gridHeight?: number;
+  rabbits: number;
+  foxes: number;
+  wolves: number;
+  hasDisease: boolean;
+  isLightMode?: boolean;
+  renderMode: GridRenderMode;
+  onChangeRenderMode: (mode: GridRenderMode) => void;
+  onSpawnAgent: (type: Species, x: number, y: number) => void;
+  onDropCarrots: (x: number, y: number) => void;
+}
+
+export const EcosystemGrid: React.FC<EcosystemGridProps> = ({
+  agents,
+  particles,
+  season,
+  gridWidth = 42,
+  gridHeight = 18,
+  rabbits,
+  foxes,
+  wolves,
+  hasDisease,
+  isLightMode = false,
+  renderMode,
+  onChangeRenderMode,
+  onSpawnAgent,
+  onDropCarrots,
+}) => {
+  const [selectedTool, setSelectedTool] = useState<'rabbit' | 'fox' | 'wolf' | 'carrots'>('rabbit');
+
+  // Build 2D character / tile map
+  const charGrid: { char: string; color: string; agentId?: string }[][] = Array.from(
+    { length: gridHeight },
+    () => Array.from({ length: gridWidth }, () => ({ char: '·', color: isLightMode ? 'text-slate-300' : 'text-zinc-700' }))
+  );
+
+  // Background subtle terrain features
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      const hash = (x * 37 + y * 73) % 23;
+      if (hash === 0) {
+        charGrid[y][x] = {
+          char: '"',
+          color: season === 'Winter' 
+            ? (isLightMode ? 'text-sky-400' : 'text-cyan-900') 
+            : (isLightMode ? 'text-emerald-500' : 'text-emerald-900'),
+        };
+      } else if (hash === 5) {
+        charGrid[y][x] = { char: '.', color: isLightMode ? 'text-slate-300' : 'text-zinc-800' };
+      }
+    }
+  }
+
+  // Draw living agents
+  for (const a of agents) {
+    if (a.y >= 0 && a.y < gridHeight && a.x >= 0 && a.x < gridWidth) {
+      if (a.type === 'rabbit') {
+        const symbol = a.age > 8 ? 'R' : 'r';
+        const color = isLightMode
+          ? 'text-emerald-700 font-bold'
+          : season === 'Winter'
+          ? 'text-emerald-300'
+          : 'text-emerald-400 font-semibold';
+        charGrid[a.y][a.x] = { char: symbol, color, agentId: a.id };
+      } else if (a.type === 'fox') {
+        const symbol = a.age > 8 ? 'F' : 'f';
+        charGrid[a.y][a.x] = {
+          char: symbol,
+          color: isLightMode ? 'text-orange-700 font-extrabold' : 'text-orange-400 font-bold',
+          agentId: a.id,
+        };
+      } else if (a.type === 'wolf') {
+        const symbol = a.age > 8 ? 'W' : 'w';
+        charGrid[a.y][a.x] = {
+          char: symbol,
+          color: isLightMode ? 'text-rose-700 font-extrabold' : 'text-rose-400 font-bold',
+          agentId: a.id,
+        };
+      }
+    }
+  }
+
+  // Overlay particles
+  for (const p of particles) {
+    const px = Math.floor(p.x);
+    const py = Math.floor(p.y);
+    if (py >= 0 && py < gridHeight && px >= 0 && px < gridWidth) {
+      charGrid[py][px] = {
+        char: p.char,
+        color:
+          p.type === 'splatter'
+            ? 'text-red-500 font-extrabold glow-red'
+            : p.type === 'birth'
+            ? 'text-emerald-400 font-bold glow-green'
+            : p.type === 'disease'
+            ? 'text-purple-400 font-bold'
+            : p.type === 'snow'
+            ? 'text-cyan-300 font-bold'
+            : 'text-amber-400 font-bold',
+      };
+    }
+  }
+
+  // Handle cell click
+  const handleCellClick = (x: number, y: number) => {
+    SoundEngine.playClick();
+    if (selectedTool === 'carrots') {
+      onDropCarrots(x, y);
+    } else {
+      onSpawnAgent(selectedTool, x, y);
+    }
+  };
+
+  // Get background meadow color based on season and light/dark mode
+  const getCanvasBg = () => {
+    if (isLightMode) {
+      if (season === 'Winter') return 'bg-sky-50/70 border-sky-200';
+      if (season === 'Autumn') return 'bg-amber-50/50 border-amber-200';
+      return 'bg-emerald-50/40 border-slate-200';
+    }
+    if (season === 'Winter') return 'bg-cyan-950/20 border-zinc-900';
+    if (season === 'Autumn') return 'bg-amber-950/20 border-zinc-900';
+    return 'bg-black/90 border-zinc-900';
+  };
+
+  return (
+    <div
+      className={`rounded-md p-2.5 flex flex-col font-mono text-xs select-none transition-colors border shadow-lg ${
+        isLightMode
+          ? 'bg-white border-slate-300 shadow-slate-200 text-slate-800'
+          : 'bg-zinc-950 border-emerald-900/60 shadow-black/60 text-zinc-200'
+      }`}
+    >
+      {/* Box Header */}
+      <div
+        className={`flex flex-wrap items-center justify-between border-b pb-1.5 mb-2 gap-2 ${
+          isLightMode ? 'border-slate-200' : 'border-emerald-900/40'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-emerald-500 font-bold tracking-wider flex items-center gap-1">
+            ┌─ ECOSYSTEM HABITAT ({gridWidth}x{gridHeight})
+          </span>
+          {/* Render Mode Switcher */}
+          <div className="flex items-center rounded border border-zinc-700 bg-zinc-900/50 p-0.5 text-[10px]">
+            <button
+              onClick={() => {
+                SoundEngine.playClick();
+                onChangeRenderMode('graphic');
+              }}
+              className={`px-1.5 py-0.5 rounded flex items-center gap-1 cursor-pointer transition ${
+                renderMode === 'graphic'
+                  ? 'bg-emerald-600 text-white font-bold'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+              title="Graphic Avatar World (Cute animated animals & FX)"
+            >
+              <Monitor className="w-3 h-3" />
+              <span>🎮 Graphic</span>
+            </button>
+            <button
+              onClick={() => {
+                SoundEngine.playClick();
+                onChangeRenderMode('ascii');
+              }}
+              className={`px-1.5 py-0.5 rounded flex items-center gap-1 cursor-pointer transition ${
+                renderMode === 'ascii'
+                  ? 'bg-emerald-600 text-white font-bold'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+              title="Retro Terminal ASCII character grid"
+            >
+              <Grid className="w-3 h-3" />
+              <span>📟 ASCII</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Interactive God-Tool Bar */}
+        <div className="flex items-center gap-1">
+          <span className="text-zinc-500 text-[11px] mr-1 hidden sm:inline">SPAWN TOOL:</span>
+          <button
+            onClick={() => {
+              SoundEngine.playClick();
+              setSelectedTool('rabbit');
+            }}
+            className={`px-2 py-0.5 rounded text-[11px] font-mono transition cursor-pointer border flex items-center gap-1 ${
+              selectedTool === 'rabbit'
+                ? isLightMode
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-400 font-bold'
+                  : 'bg-emerald-900/80 border-emerald-400 text-emerald-300 font-bold'
+                : isLightMode
+                ? 'bg-slate-100 text-slate-600 border-slate-200'
+                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-emerald-400'
+            }`}
+          >
+            <span>🐰 Rabbit</span>
+          </button>
+
+          <button
+            onClick={() => {
+              SoundEngine.playClick();
+              setSelectedTool('fox');
+            }}
+            className={`px-2 py-0.5 rounded text-[11px] font-mono transition cursor-pointer border flex items-center gap-1 ${
+              selectedTool === 'fox'
+                ? isLightMode
+                  ? 'bg-orange-100 text-orange-800 border-orange-400 font-bold'
+                  : 'bg-orange-950/80 border-orange-400 text-orange-300 font-bold'
+                : isLightMode
+                ? 'bg-slate-100 text-slate-600 border-slate-200'
+                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-orange-400'
+            }`}
+          >
+            <span>🦊 Fox</span>
+          </button>
+
+          <button
+            onClick={() => {
+              SoundEngine.playClick();
+              setSelectedTool('wolf');
+            }}
+            className={`px-2 py-0.5 rounded text-[11px] font-mono transition cursor-pointer border flex items-center gap-1 ${
+              selectedTool === 'wolf'
+                ? isLightMode
+                  ? 'bg-rose-100 text-rose-800 border-rose-400 font-bold'
+                  : 'bg-rose-950/80 border-rose-400 text-rose-300 font-bold'
+                : isLightMode
+                ? 'bg-slate-100 text-slate-600 border-slate-200'
+                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-rose-400'
+            }`}
+          >
+            <span>🐺 Wolf</span>
+          </button>
+
+          <button
+            onClick={() => {
+              SoundEngine.playClick();
+              setSelectedTool('carrots');
+            }}
+            className={`px-2 py-0.5 rounded text-[11px] font-mono transition cursor-pointer border flex items-center gap-1 ${
+              selectedTool === 'carrots'
+                ? isLightMode
+                  ? 'bg-amber-100 text-amber-800 border-amber-400 font-bold'
+                  : 'bg-amber-950/80 border-amber-400 text-amber-300 font-bold'
+                : isLightMode
+                ? 'bg-slate-100 text-slate-600 border-slate-200'
+                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-amber-400'
+            }`}
+          >
+            <span>🥕 Carrot</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Grid Canvas Screen (Graphic Mode or ASCII Mode) */}
+      <div
+        className={`relative rounded border p-2 overflow-hidden cursor-crosshair group flex justify-center items-center select-none transition-colors ${getCanvasBg()}`}
+        title="Click on habitat to deploy selected species or carrots"
+      >
+        {/* Weather / Disease Overlay effects */}
+        {hasDisease && (
+          <div className="absolute inset-0 bg-purple-950/20 pointer-events-none animate-pulse flex items-center justify-center">
+            <span className="text-purple-500/50 text-xs font-mono font-bold tracking-widest uppercase">
+              ~ ~ ~ VIRULENT PLAGUE OUTBREAK ACTIVE ~ ~ ~
+            </span>
+          </div>
+        )}
+
+        {season === 'Winter' && (
+          <div className="absolute inset-0 bg-cyan-900/10 pointer-events-none" />
+        )}
+
+        {/* 1. GRAPHIC AVATAR MODE */}
+        {renderMode === 'graphic' ? (
+          <div
+            className="w-full relative min-h-[220px] grid"
+            style={{
+              gridTemplateColumns: `repeat(${gridWidth}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${gridHeight}, minmax(0, 1fr))`,
+              aspectRatio: `${gridWidth} / ${gridHeight}`,
+              maxHeight: '260px',
+            }}
+          >
+            {/* Background meadow texture */}
+            {Array.from({ length: gridHeight }).map((_, y) =>
+              Array.from({ length: gridWidth }).map((_, x) => {
+                const hash = (x * 37 + y * 73) % 23;
+                return (
+                  <div
+                    key={`bg-${x}-${y}`}
+                    onClick={() => handleCellClick(x, y)}
+                    className="relative flex items-center justify-center hover:bg-emerald-500/20 transition-colors duration-75 cursor-pointer text-[10px]"
+                  >
+                    {hash === 0 && (
+                      <span className={isLightMode ? 'text-emerald-400 opacity-60' : 'text-emerald-900 opacity-70'}>
+                        {season === 'Winter' ? '❄' : '🌱'}
+                      </span>
+                    )}
+                    {hash === 7 && (
+                      <span className={isLightMode ? 'text-amber-400 opacity-50' : 'text-zinc-800'}>
+                        {season === 'Autumn' ? '🍂' : '·'}
+                      </span>
+                    )}
+                  </div>
+                );
+              })
+            )}
+
+            {/* Render Living Agents with Avatars */}
+            {agents.map((agent) => {
+              const leftPercent = (agent.x / gridWidth) * 100;
+              const topPercent = (agent.y / gridHeight) * 100;
+
+              return (
+                <div
+                  key={agent.id}
+                  style={{
+                    left: `${leftPercent}%`,
+                    top: `${topPercent}%`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                  className="absolute pointer-events-none transition-all duration-300 ease-out flex items-center justify-center"
+                >
+                  {agent.type === 'rabbit' && (
+                    <div className="relative group/agent">
+                      <span className="text-sm sm:text-base inline-block hover:scale-125 transition-transform animate-bounce">
+                        🐰
+                      </span>
+                      {agent.energy < 20 && (
+                        <span className="absolute -top-1 -right-1 text-[8px] text-amber-400 font-bold">!</span>
+                      )}
+                    </div>
+                  )}
+
+                  {agent.type === 'fox' && (
+                    <div className="relative group/agent">
+                      <span className="text-sm sm:text-base inline-block hover:scale-125 transition-transform">
+                        🦊
+                      </span>
+                    </div>
+                  )}
+
+                  {agent.type === 'wolf' && (
+                    <div className="relative group/agent">
+                      <span className="text-base sm:text-lg inline-block hover:scale-125 transition-transform">
+                        🐺
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Render Particle Effects */}
+            {particles.map((p) => {
+              const leftPercent = (p.x / gridWidth) * 100;
+              const topPercent = (p.y / gridHeight) * 100;
+
+              return (
+                <div
+                  key={p.id}
+                  style={{
+                    left: `${leftPercent}%`,
+                    top: `${topPercent}%`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                  className="absolute pointer-events-none transition-opacity duration-150 flex items-center justify-center font-bold text-xs"
+                >
+                  {p.type === 'splatter' ? (
+                    <span className="text-rose-500 font-extrabold animate-ping">💥</span>
+                  ) : p.type === 'birth' ? (
+                    <span className="text-emerald-400 font-bold animate-pulse">✨</span>
+                  ) : p.type === 'carrots' ? (
+                    <span className="text-amber-500 font-bold animate-bounce">🥕</span>
+                  ) : p.type === 'snow' ? (
+                    <span className="text-cyan-300 font-bold">❄</span>
+                  ) : (
+                    <span className="text-purple-400 font-bold">☣</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* 2. CLASSIC ASCII MATRIX MODE */
+          <div className="inline-block leading-none tracking-normal font-mono text-[13px] sm:text-[14px] md:text-[15px]">
+            {charGrid.map((row, y) => (
+              <div key={y} className="flex">
+                {row.map((cell, x) => (
+                  <span
+                    key={x}
+                    onClick={() => handleCellClick(x, y)}
+                    className={`char-cell inline-block text-center hover:bg-emerald-500/20 cursor-pointer transition-colors duration-75 ${cell.color}`}
+                  >
+                    {cell.char}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Legend and Status */}
+      <div
+        className={`mt-2 pt-1.5 border-t flex flex-wrap items-center justify-between text-[11px] gap-1.5 ${
+          isLightMode ? 'border-slate-200 text-slate-600' : 'border-zinc-900 text-zinc-400'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <span>
+            <strong className="text-emerald-500">🐰 Rabbits</strong>: {Math.round(rabbits)}
+          </span>
+          <span>
+            <strong className="text-orange-500">🦊 Foxes</strong>: {Math.round(foxes)}
+          </span>
+          {wolves > 0 && (
+            <span>
+              <strong className="text-rose-500">🐺 Wolves</strong>: {Math.round(wolves)}
+            </span>
+          )}
+          <span className="hidden sm:inline text-zinc-500">│ Click to spawn selected species</span>
+        </div>
+        <div className="text-zinc-500 font-mono">
+          Living Agents: {agents.length} active
+        </div>
+      </div>
+    </div>
+  );
+};
