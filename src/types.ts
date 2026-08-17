@@ -61,6 +61,29 @@ export interface Particle {
 
 export type Season = 'Spring' | 'Summer' | 'Autumn' | 'Winter';
 
+export type EventMarkerType = 
+  | 'disease' 
+  | 'disease_relieved' 
+  | 'winter_shock' 
+  | 'carrots' 
+  | 'add_foxes' 
+  | 'add_wolves' 
+  | 'cull_rabbits' 
+  | 'hunt_foxes' 
+  | 'random_shock';
+
+export interface TimelineEventMarker {
+  id: string;
+  type: EventMarkerType;
+  label: string;
+  icon: string;
+  color: string;
+  day: number;
+  t: number;
+  description: string;
+  isRelief?: boolean;
+}
+
 export interface HistoryPoint {
   t: number;
   day: number;
@@ -70,6 +93,7 @@ export interface HistoryPoint {
   alphaT: number;
   season: Season;
   eventMarker?: string;
+  eventDetails?: TimelineEventMarker;
 }
 
 export interface SimEvent {

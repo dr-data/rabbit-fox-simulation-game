@@ -9,17 +9,17 @@ import { HistoryPoint } from '../types';
  * Renders an ASCII / Braille time-series graph of population histories
  */
 export function renderAsciiTimeSeries(
-  history: HistoryPoint[],
+  points: HistoryPoint[],
   width: number = 48,
   height: number = 11,
-  showWolves: boolean = false
+  showWolves: boolean = false,
+  isViewingPast: boolean = false
 ): string[] {
-  if (!history || history.length === 0) {
-    return Array(height).fill(' '.repeat(width));
+  if (!points || points.length === 0) {
+    const empty = Array(height).fill(' '.repeat(width));
+    empty.push('      Day 0'.padEnd(width + 6, ' '));
+    return empty;
   }
-
-  // Get slice of recent points
-  const points = history.slice(-width);
   
   // Find max value for Y-axis scaling
   let maxVal = 50;
@@ -48,7 +48,7 @@ export function renderAsciiTimeSeries(
   // Offset from right if not enough points yet
   const colOffset = width - points.length;
 
-  // Plot lines for Rabbits, Foxes, Wolves
+  // Plot lines for Rabbits, Foxes, Wolves and Event markers
   for (let i = 0; i < points.length; i++) {
     const col = colOffset + i;
     if (col < 0 || col >= width) continue;
@@ -65,15 +65,29 @@ export function renderAsciiTimeSeries(
     const rowW = Math.max(0, Math.min(height - 1, height - 1 - Math.round(normW * (height - 1))));
 
     // Event markers at the top
-    if (pt.eventMarker) {
-      chart[0][col] = '!';
+    if (pt.eventDetails || pt.eventMarker) {
+      let icon = '!';
+      if (pt.eventDetails?.icon) {
+        icon = pt.eventDetails.icon;
+      } else if (pt.eventMarker) {
+        icon = pt.eventMarker;
+      }
+      chart[0][col] = icon;
+      // Dotted line down column if cell is blank
+      for (let r = 1; r < height - 1; r++) {
+        if (chart[r][col] === ' ' || chart[r][col] === '·') {
+          chart[r][col] = '┊';
+        }
+      }
     }
 
     // Overlap handling:
-    // Rabbit = 'r' or 'R' (or '●')
-    // Fox = 'f' or 'F' (or '▲')
-    // Wolf = 'w' or 'W' (or '◆')
-    if (chart[rowR][col] === ' ') chart[rowR][col] = 'r';
+    // Rabbit = 'r'
+    // Fox = 'f'
+    // Wolf = 'w'
+    if (chart[rowR][col] === ' ' || chart[rowR][col] === '·' || chart[rowR][col] === '┊') {
+      chart[rowR][col] = 'r';
+    }
     
     if (showWolves && pt.wolves > 0) {
       if (chart[rowW][col] === 'r') chart[rowW][col] = 'X';
@@ -105,7 +119,9 @@ export function renderAsciiTimeSeries(
   // Add X axis timeline label at bottom
   const startDay = points.length > 0 ? points[0].day : 0;
   const endDay = points.length > 0 ? points[points.length - 1].day : 0;
-  const bottomTimeline = `      Day ${startDay}`.padEnd(width / 2 + 5, ' ') + `Day ${endDay}`.padStart(width / 2, ' ');
+  const pastTag = isViewingPast ? ' [PAST]' : ' [LIVE]';
+  const bottomTimeline = `      Day ${startDay}`.padEnd(Math.floor(width / 2), ' ') + 
+    `${pastTag} Day ${endDay}`.padStart(Math.ceil(width / 2) + 6, ' ');
   result.push(bottomTimeline);
 
   return result;

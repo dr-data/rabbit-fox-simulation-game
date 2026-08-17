@@ -4,9 +4,21 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { HistoryPoint, SimParameters } from '../types';
+import { HistoryPoint, SimParameters, TimelineEventMarker } from '../types';
 import { calculateEquilibrium } from '../utils/mathEngine';
-import { Download, Eye, EyeOff, Info } from 'lucide-react';
+import { SoundEngine } from '../utils/soundSynthesizer';
+import { 
+  Download, 
+  Eye, 
+  EyeOff, 
+  Info, 
+  ChevronLeft, 
+  ChevronRight, 
+  ChevronsLeft, 
+  Radio, 
+  AlertCircle,
+  Clock
+} from 'lucide-react';
 
 interface VisualChartProps {
   history: HistoryPoint[];
@@ -25,29 +37,55 @@ export const VisualChart: React.FC<VisualChartProps> = ({
   params,
   isLightMode = false,
 }) => {
-  const [timeWindow, setTimeWindow] = useState<'all' | '60' | '30'>('60');
+  const [timeWindow, setTimeWindow] = useState<'all' | '120' | '60' | '30'>('60');
+  const [windowEndDay, setWindowEndDay] = useState<number | null>(null); // null = Live tracking
   const [showRabbits, setShowRabbits] = useState(true);
   const [showFoxes, setShowFoxes] = useState(true);
   const [showWolves, setShowWolves] = useState(true);
   const [showEquilibriumLines, setShowEquilibriumLines] = useState(true);
+  const [showEventMarkers, setShowEventMarkers] = useState(true);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [hoveredEvent, setHoveredEvent] = useState<TimelineEventMarker | null>(null);
+
+  const latestDay = history.length > 0 ? history[history.length - 1].day : 0;
+  const isViewingPast = windowEndDay !== null && windowEndDay < latestDay;
+
+  // Window span in days
+  const windowSpan = useMemo(() => {
+    if (timeWindow === '30') return 30;
+    if (timeWindow === '60') return 60;
+    if (timeWindow === '120') return 120;
+    return Math.max(30, latestDay);
+  }, [timeWindow, latestDay]);
+
+  // Current effective end day
+  const effectiveEndDay = windowEndDay !== null ? Math.min(latestDay, Math.max(windowSpan, windowEndDay)) : latestDay;
+  const effectiveStartDay = Math.max(0, effectiveEndDay - windowSpan);
 
   // Filter history points based on window
   const displayHistory = useMemo(() => {
     if (history.length === 0) return [];
-    if (timeWindow === 'all') return history;
-    const limit = timeWindow === '60' ? 60 : 30;
-    const latestDay = history[history.length - 1]?.day || 0;
-    const minDay = Math.max(0, latestDay - limit);
-    return history.filter((pt) => pt.day >= minDay);
-  }, [history, timeWindow]);
+    if (timeWindow === 'all' && windowEndDay === null) return history;
+    return history.filter((pt) => pt.day >= effectiveStartDay && pt.day <= effectiveEndDay);
+  }, [history, timeWindow, windowEndDay, effectiveStartDay, effectiveEndDay]);
+
+  // Events present in current visible window
+  const visibleEvents = useMemo(() => {
+    const evs: TimelineEventMarker[] = [];
+    displayHistory.forEach((pt) => {
+      if (pt.eventDetails) {
+        evs.push(pt.eventDetails);
+      }
+    });
+    return evs;
+  }, [displayHistory]);
 
   const eq = calculateEquilibrium(params);
 
   // Calculate scales
-  const chartWidth = 600;
+  const chartWidth = 620;
   const chartHeight = 220;
-  const padding = { top: 20, right: 30, bottom: 35, left: 45 };
+  const padding = { top: 24, right: 30, bottom: 35, left: 45 };
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
 
@@ -56,7 +94,7 @@ export const VisualChart: React.FC<VisualChartProps> = ({
       return { minT: 0, maxT: 30, maxPop: 150 };
     }
     const minT = displayHistory[0].t;
-    const maxT = Math.max(minT + 5, displayHistory[displayHistory.length - 1].t);
+    const maxT = Math.max(minT + 4, displayHistory[displayHistory.length - 1].t);
     let max = Math.max(
       ...displayHistory.map((d) => Math.max(d.rabbits, d.foxes, params.useWolves ? d.wolves : 0)),
       params.useLogistic ? params.carryCapacityK * 0.8 : 0,
@@ -123,17 +161,47 @@ export const VisualChart: React.FC<VisualChartProps> = ({
       .join(' ');
   }, [displayHistory, minT, maxT, maxPop, params.useWolves]);
 
+  // Backward and Forward Navigation Handlers
+  const handleStepBack = (stepDays: number = 15) => {
+    SoundEngine.playClick();
+    const curEnd = windowEndDay !== null ? windowEndDay : latestDay;
+    const newEnd = Math.max(windowSpan, curEnd - stepDays);
+    setWindowEndDay(newEnd);
+  };
+
+  const handleStepForward = (stepDays: number = 15) => {
+    SoundEngine.playClick();
+    if (windowEndDay === null) return;
+    const newEnd = windowEndDay + stepDays;
+    if (newEnd >= latestDay) {
+      setWindowEndDay(null); // Return to live
+    } else {
+      setWindowEndDay(newEnd);
+    }
+  };
+
+  const handleJumpToStart = () => {
+    SoundEngine.playClick();
+    setWindowEndDay(Math.min(latestDay, windowSpan));
+  };
+
+  const handleJumpToLive = () => {
+    SoundEngine.playClick();
+    setWindowEndDay(null);
+  };
+
   // Export CSV
   const handleExportCSV = () => {
     if (history.length === 0) return;
     const header = params.useWolves
-      ? 'Day,Time,Rabbits,Foxes,Wolves,Season,Alpha_Effective\n'
-      : 'Day,Time,Rabbits,Foxes,Season,Alpha_Effective\n';
+      ? 'Day,Time,Rabbits,Foxes,Wolves,Season,Alpha_Effective,Event\n'
+      : 'Day,Time,Rabbits,Foxes,Season,Alpha_Effective,Event\n';
     const rows = history
       .map((h) => {
+        const ev = h.eventDetails ? `"${h.eventDetails.label}"` : '';
         return params.useWolves
-          ? `${h.day},${h.t.toFixed(2)},${h.rabbits},${h.foxes},${h.wolves},${h.season},${h.alphaT.toFixed(3)}`
-          : `${h.day},${h.t.toFixed(2)},${h.rabbits},${h.foxes},${h.season},${h.alphaT.toFixed(3)}`;
+          ? `${h.day},${h.t.toFixed(2)},${h.rabbits},${h.foxes},${h.wolves},${h.season},${h.alphaT.toFixed(3)},${ev}`
+          : `${h.day},${h.t.toFixed(2)},${h.rabbits},${h.foxes},${h.season},${h.alphaT.toFixed(3)},${ev}`;
       })
       .join('\n');
 
@@ -141,7 +209,7 @@ export const VisualChart: React.FC<VisualChartProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `lotka_volterra_simulation_data_day_${Math.floor(history[history.length - 1]?.day || 0)}.csv`);
+    link.setAttribute('download', `lotka_volterra_simulation_data_day_${Math.floor(latestDay)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -152,7 +220,7 @@ export const VisualChart: React.FC<VisualChartProps> = ({
   // Y-axis ticks
   const yTicks = [0, Math.round(maxPop * 0.25), Math.round(maxPop * 0.5), Math.round(maxPop * 0.75), maxPop];
 
-  // X-axis ticks (approx 4-5 ticks)
+  // X-axis ticks (approx 5 ticks)
   const xTicks = useMemo(() => {
     const count = 5;
     const step = (maxT - minT) / count;
@@ -161,10 +229,10 @@ export const VisualChart: React.FC<VisualChartProps> = ({
 
   return (
     <div className="flex flex-col gap-2 font-mono select-none">
-      {/* Controls & Filter Bar */}
+      {/* Top Filter & Species Toggles */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         {/* Toggle species lines */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={() => setShowRabbits((v) => !v)}
             className={`px-2 py-0.5 rounded flex items-center gap-1 text-[11px] font-bold transition cursor-pointer border ${
@@ -234,7 +302,23 @@ export const VisualChart: React.FC<VisualChartProps> = ({
             }`}
             title="Toggle theoretical equilibrium reference lines (R*, F*)"
           >
-            <span>Isoclines (R*, F*)</span>
+            <span>Isoclines</span>
+          </button>
+
+          <button
+            onClick={() => setShowEventMarkers((v) => !v)}
+            className={`px-1.5 py-0.5 rounded text-[10px] transition cursor-pointer border hidden sm:inline-flex items-center gap-1 ${
+              showEventMarkers
+                ? isLightMode
+                  ? 'bg-cyan-50 text-cyan-800 border-cyan-300'
+                  : 'bg-zinc-900 text-cyan-300 border-cyan-600/50'
+                : isLightMode
+                ? 'bg-slate-100 text-slate-400 border-slate-200'
+                : 'bg-zinc-900 text-zinc-600 border-zinc-800'
+            }`}
+            title="Toggle Event trigger & relief markers on timeline"
+          >
+            <span>⚡ Events</span>
           </button>
         </div>
 
@@ -242,12 +326,12 @@ export const VisualChart: React.FC<VisualChartProps> = ({
         <div className="flex items-center gap-1.5">
           <div className="flex items-center rounded border border-zinc-700 bg-zinc-900/60 p-0.5 text-[11px]">
             <button
-              onClick={() => setTimeWindow('30')}
+              onClick={() => {
+                setTimeWindow('30');
+              }}
               className={`px-1.5 py-0.5 rounded cursor-pointer transition ${
                 timeWindow === '30'
-                  ? isLightMode
-                    ? 'bg-emerald-600 text-white font-bold'
-                    : 'bg-emerald-600 text-white font-bold'
+                  ? 'bg-emerald-600 text-white font-bold'
                   : isLightMode
                   ? 'text-slate-600 hover:text-slate-900'
                   : 'text-zinc-400 hover:text-zinc-200'
@@ -256,12 +340,12 @@ export const VisualChart: React.FC<VisualChartProps> = ({
               30d
             </button>
             <button
-              onClick={() => setTimeWindow('60')}
+              onClick={() => {
+                setTimeWindow('60');
+              }}
               className={`px-1.5 py-0.5 rounded cursor-pointer transition ${
                 timeWindow === '60'
-                  ? isLightMode
-                    ? 'bg-emerald-600 text-white font-bold'
-                    : 'bg-emerald-600 text-white font-bold'
+                  ? 'bg-emerald-600 text-white font-bold'
                   : isLightMode
                   ? 'text-slate-600 hover:text-slate-900'
                   : 'text-zinc-400 hover:text-zinc-200'
@@ -270,12 +354,27 @@ export const VisualChart: React.FC<VisualChartProps> = ({
               60d
             </button>
             <button
-              onClick={() => setTimeWindow('all')}
+              onClick={() => {
+                setTimeWindow('120');
+              }}
+              className={`px-1.5 py-0.5 rounded cursor-pointer transition ${
+                timeWindow === '120'
+                  ? 'bg-emerald-600 text-white font-bold'
+                  : isLightMode
+                  ? 'text-slate-600 hover:text-slate-900'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              120d
+            </button>
+            <button
+              onClick={() => {
+                setTimeWindow('all');
+                setWindowEndDay(null);
+              }}
               className={`px-1.5 py-0.5 rounded cursor-pointer transition ${
                 timeWindow === 'all'
-                  ? isLightMode
-                    ? 'bg-emerald-600 text-white font-bold'
-                    : 'bg-emerald-600 text-white font-bold'
+                  ? 'bg-emerald-600 text-white font-bold'
                   : isLightMode
                   ? 'text-slate-600 hover:text-slate-900'
                   : 'text-zinc-400 hover:text-zinc-200'
@@ -300,6 +399,105 @@ export const VisualChart: React.FC<VisualChartProps> = ({
         </div>
       </div>
 
+      {/* Horizontal Timeline Backward/Forward Scrubber Control Bar */}
+      <div
+        className={`px-2 py-1 rounded border flex flex-wrap items-center justify-between gap-2 text-[11px] transition-colors ${
+          isViewingPast
+            ? isLightMode
+              ? 'bg-amber-50 border-amber-300 text-amber-900'
+              : 'bg-amber-950/40 border-amber-600/60 text-amber-300'
+            : isLightMode
+            ? 'bg-slate-50 border-slate-200 text-slate-700'
+            : 'bg-zinc-900/60 border-zinc-800 text-zinc-400'
+        }`}
+      >
+        {/* Navigation Step Buttons */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleJumpToStart}
+            disabled={effectiveStartDay === 0}
+            className={`p-1 rounded cursor-pointer border disabled:opacity-40 disabled:cursor-not-allowed transition ${
+              isLightMode ? 'bg-white hover:bg-slate-100 border-slate-200' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700'
+            }`}
+            title="Jump to Start (Day 0)"
+          >
+            <ChevronsLeft className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => handleStepBack(15)}
+            disabled={effectiveStartDay === 0}
+            className={`px-1.5 py-0.5 rounded cursor-pointer border flex items-center gap-0.5 disabled:opacity-40 disabled:cursor-not-allowed transition text-[10px] ${
+              isLightMode ? 'bg-white hover:bg-slate-100 border-slate-200' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700'
+            }`}
+            title="Step back 15 days"
+          >
+            <ChevronLeft className="w-3 h-3" />
+            <span>-15d</span>
+          </button>
+          <button
+            onClick={() => handleStepForward(15)}
+            disabled={!isViewingPast}
+            className={`px-1.5 py-0.5 rounded cursor-pointer border flex items-center gap-0.5 disabled:opacity-40 disabled:cursor-not-allowed transition text-[10px] ${
+              isLightMode ? 'bg-white hover:bg-slate-100 border-slate-200' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700'
+            }`}
+            title="Step forward 15 days"
+          >
+            <span>+15d</span>
+            <ChevronRight className="w-3 h-3" />
+          </button>
+        </div>
+
+        {/* Timeline Slider & Span indicator */}
+        <div className="flex-1 min-w-[140px] flex items-center gap-2">
+          <span className="text-[10px] font-bold shrink-0">
+            Day {effectiveStartDay}
+          </span>
+          <input
+            type="range"
+            min={windowSpan}
+            max={Math.max(windowSpan, latestDay)}
+            step={1}
+            value={effectiveEndDay}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              if (val >= latestDay) {
+                setWindowEndDay(null);
+              } else {
+                setWindowEndDay(val);
+              }
+            }}
+            className="w-full accent-emerald-500 h-1.5 rounded bg-zinc-700 cursor-pointer"
+          />
+          <span className="text-[10px] font-bold shrink-0">
+            Day {effectiveEndDay}
+          </span>
+        </div>
+
+        {/* Live / Past Status Tag & Jump to Live */}
+        <div className="flex items-center gap-1.5">
+          {isViewingPast ? (
+            <div className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                <Clock className="w-3 h-3" />
+                PAST
+              </span>
+              <button
+                onClick={handleJumpToLive}
+                className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition shadow-xs flex items-center gap-1"
+              >
+                <Radio className="w-3 h-3 animate-pulse text-white" />
+                <span>Jump to Live (Day {latestDay})</span>
+              </button>
+            </div>
+          ) : (
+            <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+              <Radio className="w-3 h-3 animate-pulse text-emerald-400" />
+              LIVE
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* SVG Canvas Area */}
       <div
         className={`relative rounded border p-1 overflow-hidden transition-colors ${
@@ -309,7 +507,10 @@ export const VisualChart: React.FC<VisualChartProps> = ({
         <svg
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
           className="w-full h-auto block"
-          onMouseLeave={() => setHoverIndex(null)}
+          onMouseLeave={() => {
+            setHoverIndex(null);
+            setHoveredEvent(null);
+          }}
           onMouseMove={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const mouseX = ((e.clientX - rect.left) / rect.width) * chartWidth;
@@ -496,8 +697,56 @@ export const VisualChart: React.FC<VisualChartProps> = ({
             />
           )}
 
+          {/* EVENT TRIGGER & RELIEF MARKERS */}
+          {showEventMarkers &&
+            visibleEvents.map((ev) => {
+              const x = getX(ev.t);
+              const isHovered = hoveredEvent?.id === ev.id;
+              return (
+                <g 
+                  key={ev.id} 
+                  className="cursor-pointer"
+                  onMouseEnter={() => setHoveredEvent(ev)}
+                >
+                  {/* Vertical dashed event line */}
+                  <line
+                    x1={x}
+                    y1={padding.top - 8}
+                    x2={x}
+                    y2={chartHeight - padding.bottom}
+                    stroke={ev.color || '#06b6d4'}
+                    strokeDasharray="3,3"
+                    strokeWidth={isHovered ? '2' : '1.2'}
+                    opacity={isHovered ? 1 : 0.8}
+                  />
+
+                  {/* Top Pin Badge */}
+                  <circle
+                    cx={x}
+                    cy={padding.top - 10}
+                    r={isHovered ? '8' : '6.5'}
+                    fill={ev.color || '#06b6d4'}
+                    stroke="#ffffff"
+                    strokeWidth="1.5"
+                    className="transition-all"
+                  />
+                  <text
+                    x={x}
+                    y={padding.top - 6.5}
+                    textAnchor="middle"
+                    fontSize={isHovered ? '9' : '8'}
+                    fill="#ffffff"
+                    fontFamily="monospace"
+                    fontWeight="bold"
+                  >
+                    {ev.icon}
+                  </text>
+                </g>
+              );
+            })}
+
           {/* Active Live End Dots */}
-          {displayHistory.length > 0 && (
+          {!isViewingPast && displayHistory.length > 0 && (
             <>
               {showRabbits && (
                 <circle
@@ -585,8 +834,8 @@ export const VisualChart: React.FC<VisualChartProps> = ({
           )}
         </svg>
 
-        {/* Hover Tooltip Overlay */}
-        {hoveredData && (
+        {/* Hover Tooltip Overlay for Data Point */}
+        {hoveredData && !hoveredEvent && (
           <div
             className={`absolute top-2 right-2 p-2 rounded border text-xs shadow-lg font-mono pointer-events-none ${
               isLightMode
@@ -613,6 +862,12 @@ export const VisualChart: React.FC<VisualChartProps> = ({
                   <span className="font-bold">{hoveredData.wolves}</span>
                 </div>
               )}
+              {hoveredData.eventDetails && (
+                <div className="text-[10px] text-cyan-400 pt-0.5 border-t border-zinc-800 font-bold flex items-center gap-1">
+                  <span>{hoveredData.eventDetails.icon}</span>
+                  <span>{hoveredData.eventDetails.label}</span>
+                </div>
+              )}
               {params.useSeasonality && (
                 <div className="text-[10px] text-amber-500 pt-0.5 border-t border-zinc-800">
                   Effective α(t): {hoveredData.alphaT.toFixed(2)}
@@ -621,7 +876,58 @@ export const VisualChart: React.FC<VisualChartProps> = ({
             </div>
           </div>
         )}
+
+        {/* Hovered Event Tooltip */}
+        {hoveredEvent && (
+          <div
+            className={`absolute top-2 right-2 p-2.5 rounded border text-xs shadow-lg font-mono pointer-events-none max-w-[260px] ${
+              isLightMode
+                ? 'bg-white border-slate-300 text-slate-800 shadow-slate-200'
+                : 'bg-zinc-950 border-cyan-500/80 text-zinc-200 shadow-black'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 font-bold text-[12px] pb-1 mb-1 border-b border-zinc-700/60" style={{ color: hoveredEvent.color }}>
+              <span className="text-sm">{hoveredEvent.icon}</span>
+              <span>{hoveredEvent.label}</span>
+            </div>
+            <div className="text-[11px] text-zinc-400 mb-1">
+              Triggered on <strong>Day {hoveredEvent.day}</strong> (t={hoveredEvent.t.toFixed(1)})
+            </div>
+            <p className="text-[10px] text-zinc-300 leading-relaxed">
+              {hoveredEvent.description}
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Events Summary Strip in current visible time window */}
+      {visibleEvents.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 px-1 text-[11px]">
+          <span className="text-zinc-500 font-bold flex items-center gap-1">
+            <AlertCircle className="w-3 h-3 text-cyan-400" />
+            Events in Window:
+          </span>
+          {visibleEvents.map((ev) => (
+            <button
+              key={ev.id}
+              onClick={() => {
+                SoundEngine.playClick();
+                setHoveredEvent(ev);
+              }}
+              className="px-1.5 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1 cursor-pointer transition"
+              style={{
+                backgroundColor: isLightMode ? '#f8fafc' : '#18181b',
+                borderColor: ev.color,
+                color: ev.color,
+              }}
+              title={ev.description}
+            >
+              <span>{ev.icon}</span>
+              <span>Day {ev.day}: {ev.label.split(' ')[0]}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Footer info & biological equilibrium summary */}
       <div
@@ -634,7 +940,7 @@ export const VisualChart: React.FC<VisualChartProps> = ({
           <span>Equilibrium Center: R* = {eq.rabbitEq} prey, F* = {eq.foxEq} predators</span>
         </div>
         <div>
-          Current Biomass Ratio (R/F): {(currentRabbits / Math.max(1, currentFoxes)).toFixed(2)}
+          Viewing Window: {displayHistory.length} data points (Day {effectiveStartDay} - Day {effectiveEndDay})
         </div>
       </div>
     </div>

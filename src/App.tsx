@@ -16,6 +16,7 @@ import {
   SimEvent,
   SimParameters,
   Species,
+  TimelineEventMarker,
 } from './types';
 import { PRESET_MODELS } from './data/presets';
 import { GAME_CHALLENGES } from './data/challenges';
@@ -258,18 +259,44 @@ export default function App() {
 
   // Event Triggers (Interventions)
   const handleTriggerEvent = (eventType: string) => {
+    const curDay = simRef.current.day;
+    const curR = simRef.current.rabbits;
+    const curF = simRef.current.foxes;
+    const curW = simRef.current.wolves;
+    const { alphaT, season } = calculateSeasonality(
+      curDay,
+      params.alpha,
+      params.useSeasonality,
+      params.seasonalityA,
+      params.seasonalityPeriod
+    );
+
+    let marker: TimelineEventMarker | null = null;
+
     switch (eventType) {
       case 'disease': {
         setHasDisease(true);
         setDiseaseTimer(15);
-        setRabbits((r) => Math.max(1, Math.round(r * 0.75)));
+        const nextR = Math.max(1, Math.round(curR * 0.75));
+        setRabbits(nextR);
         SoundEngine.playAlarm();
+        marker = {
+          id: `ev-${Date.now()}`,
+          type: 'disease',
+          label: 'Plague Outbreak (-25% Prey)',
+          icon: '☣',
+          color: '#ef4444',
+          day: Math.floor(curDay),
+          t: curDay,
+          description: 'Epidemic outbreak! 25% of rabbit population lost, birth vitality impaired.',
+        };
         addEventLog(`Plague outbreak! Rabbit population decimated by 25%.`, 'danger');
         break;
       }
       case 'winter_shock': {
         SoundEngine.playWinterWind();
-        setParams((p) => ({ ...p, alpha: Math.max(0.1, p.alpha * 0.6) }));
+        const nextAlpha = Math.max(0.1, params.alpha * 0.6);
+        setParams((p) => ({ ...p, alpha: nextAlpha }));
         const newSnow: Particle[] = Array.from({ length: 15 }, () => ({
           id: `snow-${Math.random()}`,
           x: Math.floor(Math.random() * 42),
@@ -283,50 +310,143 @@ export default function App() {
           type: 'snow',
         }));
         setParticles((prev) => [...prev, ...newSnow]);
+        marker = {
+          id: `ev-${Date.now()}`,
+          type: 'winter_shock',
+          label: 'Severe Frost Shock (Alpha Dropped)',
+          icon: '❄',
+          color: '#06b6d4',
+          day: Math.floor(curDay),
+          t: curDay,
+          description: `Severe frost wave! Vegetation growth rate reduced to α=${nextAlpha.toFixed(2)}.`,
+        };
         addEventLog(`Severe frost shock! Growth severely impaired.`, 'alert');
         break;
       }
       case 'carrots': {
         SoundEngine.playBirth();
-        setRabbits((r) => r + 30);
+        const nextR = curR + 30;
+        setRabbits(nextR);
+        marker = {
+          id: `ev-${Date.now()}`,
+          type: 'carrots',
+          label: 'Vegetation Airdrop (+30 Rabbits)',
+          icon: '🥕',
+          color: '#f59e0b',
+          day: Math.floor(curDay),
+          t: curDay,
+          description: 'High-yield nutrient vegetation airdropped into habitat! +30 Rabbits.',
+        };
         addEventLog(`Airdropped high-yield vegetation! +30 Rabbits.`, 'success');
         break;
       }
       case 'add_foxes': {
         SoundEngine.playClick();
-        setFoxes((f) => f + 8);
+        const nextF = curF + 8;
+        setFoxes(nextF);
+        marker = {
+          id: `ev-${Date.now()}`,
+          type: 'add_foxes',
+          label: 'Fox Migration (+8 Foxes)',
+          icon: '🦊',
+          color: '#f97316',
+          day: Math.floor(curDay),
+          t: curDay,
+          description: 'Migrating pack of 8 adult foxes entered ecosystem, increasing predation pressure.',
+        };
         addEventLog(`Fox pack migrated into ecosystem! +8 Foxes.`, 'predation');
         break;
       }
       case 'add_wolves': {
         SoundEngine.playWolfHowl();
         setParams((p) => ({ ...p, useWolves: true }));
-        setWolves((w) => w + 5);
+        const nextW = curW + 5;
+        setWolves(nextW);
+        marker = {
+          id: `ev-${Date.now()}`,
+          type: 'add_wolves',
+          label: 'Apex Wolves Released (+5 Wolves)',
+          icon: '🐺',
+          color: '#e11d48',
+          day: Math.floor(curDay),
+          t: curDay,
+          description: 'Pack of 5 apex wolves introduced! Competing with foxes and hunting prey.',
+        };
         addEventLog(`Apex wolf pack released into habitat! +5 Wolves.`, 'danger');
         break;
       }
       case 'cull_rabbits': {
         SoundEngine.playClick();
-        setRabbits((r) => Math.max(0, Math.round(r * 0.8)));
+        const nextR = Math.max(0, Math.round(curR * 0.8));
+        setRabbits(nextR);
+        marker = {
+          id: `ev-${Date.now()}`,
+          type: 'cull_rabbits',
+          label: 'Prey Cull (-20% Rabbits)',
+          icon: '🎯',
+          color: '#a855f7',
+          day: Math.floor(curDay),
+          t: curDay,
+          description: 'Managed ecological culling performed (-20% prey biomass).',
+        };
         addEventLog(`Prey culling conducted (-20% Rabbits).`, 'info');
         break;
       }
       case 'hunt_foxes': {
         SoundEngine.playClick();
-        setFoxes((f) => Math.max(0, Math.round(f * 0.75)));
+        const nextF = Math.max(0, Math.round(curF * 0.75));
+        setFoxes(nextF);
         if (params.useWolves) {
           setWolves((w) => Math.max(0, Math.round(w * 0.8)));
         }
+        marker = {
+          id: `ev-${Date.now()}`,
+          type: 'hunt_foxes',
+          label: 'Predator Hunt (-25% Foxes)',
+          icon: '🏹',
+          color: '#ec4899',
+          day: Math.floor(curDay),
+          t: curDay,
+          description: 'Selective predator harvest conducted (-25% foxes).',
+        };
         addEventLog(`Predator hunt conducted (-25% Foxes).`, 'info');
         break;
       }
       case 'random_shock': {
         SoundEngine.playAlarm();
         const shock = (Math.random() - 0.5) * 0.4;
-        setParams((p) => ({ ...p, alpha: Math.max(0.2, Math.min(1.8, p.alpha + shock)) }));
-        addEventLog(`Unpredictable climate anomaly altered growth rate to ${params.alpha.toFixed(2)}.`, 'event');
+        const nextAlpha = Math.max(0.2, Math.min(1.8, params.alpha + shock));
+        setParams((p) => ({ ...p, alpha: nextAlpha }));
+        marker = {
+          id: `ev-${Date.now()}`,
+          type: 'random_shock',
+          label: 'Climate Shock',
+          icon: '⚡',
+          color: '#eab308',
+          day: Math.floor(curDay),
+          t: curDay,
+          description: `Stochastic climate anomaly altered baseline growth rate to α=${nextAlpha.toFixed(2)}.`,
+        };
+        addEventLog(`Unpredictable climate anomaly altered growth rate to ${nextAlpha.toFixed(2)}.`, 'event');
         break;
       }
+    }
+
+    if (marker) {
+      setHistory((prev) => [
+        ...prev.slice(-3000),
+        {
+          t: curDay,
+          day: Math.floor(curDay),
+          rabbits: Math.round(curR),
+          foxes: Math.round(curF),
+          wolves: Math.round(curW),
+          alphaT,
+          season,
+          eventMarker: marker.icon,
+          eventDetails: marker,
+        },
+      ]);
     }
   };
 
@@ -415,11 +535,24 @@ export default function App() {
       // 2. Disease timer countdown
       let nextDiseaseTimer = curDiseaseTimer;
       let nextHasDisease = simRef.current.hasDisease;
+      let reliefMarker: TimelineEventMarker | null = null;
+
       if (nextHasDisease) {
         nextDiseaseTimer -= dt;
         if (nextDiseaseTimer <= 0) {
           nextHasDisease = false;
           nextDiseaseTimer = 0;
+          reliefMarker = {
+            id: `ev-${Date.now()}`,
+            type: 'disease_relieved',
+            label: 'Plague Relieved (Recovery)',
+            icon: '🌿',
+            color: '#10b981',
+            day: Math.floor(nextDay),
+            t: nextDay,
+            description: 'Plague epidemic has naturally subsided. Rabbit population health restored.',
+            isRelief: true,
+          };
           addEventLog('Plague outbreak has naturally subsided.', 'info');
         }
       }
@@ -506,10 +639,10 @@ export default function App() {
       setHasDisease(nextHasDisease);
       setDiseaseTimer(nextDiseaseTimer);
 
-      // Record history sample periodically (~every 0.4 days)
-      if (Math.floor(nextDay * 2.5) !== Math.floor(curDay * 2.5)) {
+      // Record history sample periodically (~every 0.4 days) or immediately if an event was relieved
+      if (reliefMarker || Math.floor(nextDay * 2.5) !== Math.floor(curDay * 2.5)) {
         setHistory((prev) => [
-          ...prev.slice(-120),
+          ...prev.slice(-3000),
           {
             t: nextDay,
             day: Math.floor(nextDay),
@@ -518,6 +651,7 @@ export default function App() {
             wolves: Math.round(nextState.wolves),
             alphaT,
             season,
+            ...(reliefMarker ? { eventMarker: reliefMarker.icon, eventDetails: reliefMarker } : {}),
           },
         ]);
       }
