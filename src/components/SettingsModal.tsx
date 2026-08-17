@@ -13,6 +13,7 @@ import {
   Palette,
   Layout,
   Tv,
+  Music,
   Volume2,
   VolumeX,
   RotateCcw,
@@ -558,17 +559,165 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* SECTION 4: DISPLAY, SENSORY & SPLAY EFFECTS */}
+          {/* SECTION 4: DISPLAY, SENSORY & AUDIO EFFECTS */}
           <div className="space-y-2 pt-2 border-t border-zinc-800/40">
             <span className="font-bold flex items-center gap-1.5 text-emerald-500">
-              <Tv className="w-3.5 h-3.5" />
-              <span>5. SENSORY & SCREEN EFFECTS</span>
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>5. AUDIO & SENSORY SOUNDSCAPE</span>
             </span>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Ambient Generative Music Toggle & Style */}
+              <div
+                className={`p-2.5 rounded border flex flex-col justify-between gap-2 ${
+                  isLightMode ? 'border-slate-200 bg-slate-50' : 'border-zinc-800 bg-zinc-900/60'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Music className={`w-4 h-4 ${tempSettings.musicEnabled !== false ? 'text-emerald-500' : 'text-zinc-500'}`} />
+                    <div>
+                      <div className="font-bold text-[11px]">Calming Ambient Music</div>
+                      <div className="text-[9px] text-zinc-500">Peaceful generative soundscape</div>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={tempSettings.musicEnabled !== false}
+                    onChange={(e) => {
+                      SoundEngine.playClick();
+                      handleUpdate('musicEnabled', e.target.checked);
+                      if (e.target.checked) {
+                        SoundEngine.setMusicMuted(false);
+                      } else {
+                        SoundEngine.setMusicMuted(true);
+                      }
+                    }}
+                    className="w-4 h-4 accent-emerald-500 cursor-pointer"
+                  />
+                </div>
+
+                {tempSettings.musicEnabled !== false && (
+                  <div className="space-y-1.5 pt-1.5 border-t border-zinc-800/20">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="text-zinc-500">Music Soundscape:</span>
+                      <select
+                        value={tempSettings.musicStyle || 'meadow'}
+                        onChange={(e) => {
+                          const val = e.target.value as 'meadow' | 'zen' | 'ethereal';
+                          handleUpdate('musicStyle', val);
+                          SoundEngine.setMusicStyle(val);
+                        }}
+                        className={`text-[10px] rounded border px-1.5 py-0.5 focus:outline-none ${
+                          isLightMode ? 'bg-white border-slate-300 text-slate-800' : 'bg-zinc-800 border-zinc-700 text-zinc-200'
+                        }`}
+                      >
+                        <option value="meadow">🌿 Peaceful Meadow (Major)</option>
+                        <option value="zen">🌊 Zen Sanctuary (Modal)</option>
+                        <option value="ethereal">✨ Ethereal Drift (Warm)</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[10px]">
+                      <span className="text-zinc-500 w-16">Music Vol:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={tempSettings.musicVolume ?? 0.35}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          handleUpdate('musicVolume', val);
+                          SoundEngine.setMusicVolume(val);
+                        }}
+                        className="flex-1 h-1.5 accent-emerald-500 cursor-pointer"
+                      />
+                      <span className="font-mono text-zinc-400 w-8 text-right">
+                        {Math.round((tempSettings.musicVolume ?? 0.35) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Sound Effects Toggle & Volume */}
+              <div
+                className={`p-2.5 rounded border flex flex-col justify-between gap-2 ${
+                  isLightMode ? 'border-slate-200 bg-slate-50' : 'border-zinc-800 bg-zinc-900/60'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {tempSettings.soundEnabled ? (
+                      <Volume2 className="w-4 h-4 text-emerald-500" />
+                    ) : (
+                      <VolumeX className="w-4 h-4 text-zinc-500" />
+                    )}
+                    <div>
+                      <div className="font-bold text-[11px]">Organic Nature SFX</div>
+                      <div className="text-[9px] text-zinc-500">Soft acoustic bells & taps</div>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={tempSettings.soundEnabled}
+                    onChange={(e) => {
+                      SoundEngine.playClick();
+                      handleUpdate('soundEnabled', e.target.checked);
+                      SoundEngine.setMuted(!e.target.checked);
+                    }}
+                    className="w-4 h-4 accent-emerald-500 cursor-pointer"
+                  />
+                </div>
+
+                {tempSettings.soundEnabled && (
+                  <div className="space-y-1.5 pt-1.5 border-t border-zinc-800/20">
+                    <div className="flex items-center gap-2 text-[10px]">
+                      <span className="text-zinc-500 w-16">SFX Vol:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={tempSettings.sfxVolume ?? 0.3}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          handleUpdate('sfxVolume', val);
+                          SoundEngine.setSfxVolume(val);
+                        }}
+                        className="flex-1 h-1.5 accent-emerald-500 cursor-pointer"
+                      />
+                      <span className="font-mono text-zinc-400 w-8 text-right">
+                        {Math.round((tempSettings.sfxVolume ?? 0.3) * 100)}%
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-0.5">
+                      <span className="text-[9px] text-zinc-500">Test Chime:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          SoundEngine.playBirth();
+                        }}
+                        className={`text-[9px] px-2 py-0.5 rounded border transition cursor-pointer ${
+                          isLightMode
+                            ? 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
+                            : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-200'
+                        }`}
+                      >
+                        🔔 Preview Bell
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
               {/* CRT Toggle */}
               <div
-                className={`p-2.5 rounded border flex items-center justify-between gap-2 ${
+                className={`p-2 rounded border flex items-center justify-between gap-2 ${
                   isLightMode ? 'border-slate-200 bg-slate-50' : 'border-zinc-800 bg-zinc-900/60'
                 }`}
               >
@@ -590,37 +739,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 />
               </div>
 
-              {/* Sound Synthesizer Toggle */}
-              <div
-                className={`p-2.5 rounded border flex items-center justify-between gap-2 ${
-                  isLightMode ? 'border-slate-200 bg-slate-50' : 'border-zinc-800 bg-zinc-900/60'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {tempSettings.soundEnabled ? (
-                    <Volume2 className="w-4 h-4 text-emerald-500" />
-                  ) : (
-                    <VolumeX className="w-4 h-4 text-zinc-500" />
-                  )}
-                  <div>
-                    <div className="font-bold text-[11px]">8-Bit Audio Synth</div>
-                    <div className="text-[9px] text-zinc-500">Sound cues & alerts</div>
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={tempSettings.soundEnabled}
-                  onChange={(e) => {
-                    SoundEngine.playClick();
-                    handleUpdate('soundEnabled', e.target.checked);
-                  }}
-                  className="w-4 h-4 accent-emerald-500 cursor-pointer"
-                />
-              </div>
-
               {/* FPS Counter Toggle */}
               <div
-                className={`p-2.5 rounded border flex items-center justify-between gap-2 ${
+                className={`p-2 rounded border flex items-center justify-between gap-2 ${
                   isLightMode ? 'border-slate-200 bg-slate-50' : 'border-zinc-800 bg-zinc-900/60'
                 }`}
               >

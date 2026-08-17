@@ -200,16 +200,26 @@ export const EcosystemGrid: React.FC<EcosystemGridProps> = ({
             ┌─ ECOSYSTEM HABITAT ({gridWidth}x{gridHeight})
           </span>
           {/* Render Mode Switcher */}
-          <div className="flex items-center rounded border border-zinc-700 bg-zinc-900/50 p-0.5 text-[10px]">
+          <div
+            className={`flex items-center rounded border p-0.5 text-[10px] transition-colors ${
+              isLightMode
+                ? 'border-slate-300 bg-slate-100 shadow-xs'
+                : 'border-zinc-700 bg-zinc-900/50'
+            }`}
+          >
             <button
               onClick={() => {
                 SoundEngine.playClick();
                 onChangeRenderMode('graphic');
               }}
-              className={`px-1.5 py-0.5 rounded flex items-center gap-1 cursor-pointer transition ${
+              className={`px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer transition ${
                 renderMode === 'graphic'
-                  ? 'bg-emerald-600 text-white font-bold'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? isLightMode
+                    ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                    : 'bg-emerald-600 text-white font-bold'
+                  : isLightMode
+                  ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/80'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
               }`}
               title="Graphic Avatar World (Cute animated animals & FX)"
             >
@@ -221,10 +231,14 @@ export const EcosystemGrid: React.FC<EcosystemGridProps> = ({
                 SoundEngine.playClick();
                 onChangeRenderMode('ascii');
               }}
-              className={`px-1.5 py-0.5 rounded flex items-center gap-1 cursor-pointer transition ${
+              className={`px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer transition ${
                 renderMode === 'ascii'
-                  ? 'bg-emerald-600 text-white font-bold'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? isLightMode
+                    ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                    : 'bg-emerald-600 text-white font-bold'
+                  : isLightMode
+                  ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/80'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
               }`}
               title="Retro Terminal ASCII character grid"
             >

@@ -70,9 +70,10 @@ export default function App() {
   const [uiSettings, setUiSettings] = useState<UISettings>(initialSettings);
   const [viewMode, setViewMode] = useState<PlotViewMode>(initialSettings.defaultViewMode || 'visual_chart');
   const [gridRenderMode, setGridRenderMode] = useState<GridRenderMode>(initialSettings.defaultGridRenderMode || 'graphic');
-  const [theme, setTheme] = useState<ColorTheme>(initialSettings.defaultTheme || 'phosphor-green');
-  const [crtEnabled, setCrtEnabled] = useState<boolean>(initialSettings.crtEnabled ?? true);
+  const [theme, setTheme] = useState<ColorTheme>(initialSettings.defaultTheme || 'light-lab');
+  const [crtEnabled, setCrtEnabled] = useState<boolean>(initialSettings.crtEnabled ?? false);
   const [isMuted, setIsMuted] = useState<boolean>(!initialSettings.soundEnabled);
+  const [isMusicMuted, setIsMusicMuted] = useState<boolean>(initialSettings.musicEnabled === false);
   const [showFpsCounter, setShowFpsCounter] = useState<boolean>(initialSettings.showFpsCounter ?? true);
   const [particleDensity, setParticleDensity] = useState<ParticleDensity>(initialSettings.particleDensity || 'high');
   const [hasDisease, setHasDisease] = useState<boolean>(false);
@@ -84,9 +85,35 @@ export default function App() {
   // Derive light mode flag
   const isLightMode = theme.startsWith('light-');
 
-  // Initialize sound engine mute state
+  // Initialize sound engine and start ambient music on user interaction
   useEffect(() => {
     SoundEngine.setMuted(!initialSettings.soundEnabled);
+    SoundEngine.setMusicMuted(initialSettings.musicEnabled === false);
+    if (initialSettings.musicVolume !== undefined) SoundEngine.setMusicVolume(initialSettings.musicVolume);
+    if (initialSettings.sfxVolume !== undefined) SoundEngine.setSfxVolume(initialSettings.sfxVolume);
+    if (initialSettings.musicStyle) SoundEngine.setMusicStyle(initialSettings.musicStyle);
+
+    // Modern browsers require a user gesture before Web Audio context can play sound
+    const handleFirstGesture = () => {
+      SoundEngine.init();
+      if (initialSettings.musicEnabled !== false && initialSettings.soundEnabled) {
+        SoundEngine.startAmbientMusic();
+      }
+      window.removeEventListener('click', handleFirstGesture);
+      window.removeEventListener('keydown', handleFirstGesture);
+      window.removeEventListener('touchstart', handleFirstGesture);
+    };
+
+    window.addEventListener('click', handleFirstGesture, { once: true });
+    window.addEventListener('keydown', handleFirstGesture, { once: true });
+    window.addEventListener('touchstart', handleFirstGesture, { once: true });
+
+    return () => {
+      window.removeEventListener('click', handleFirstGesture);
+      window.removeEventListener('keydown', handleFirstGesture);
+      window.removeEventListener('touchstart', handleFirstGesture);
+      SoundEngine.stopAmbientMusic();
+    };
   }, []);
 
   // 7. Event Logs
@@ -792,6 +819,14 @@ export default function App() {
     setCrtEnabled(nextSettings.crtEnabled);
     setIsMuted(!nextSettings.soundEnabled);
     SoundEngine.setMuted(!nextSettings.soundEnabled);
+    
+    const musicMuted = nextSettings.musicEnabled === false;
+    setIsMusicMuted(musicMuted);
+    SoundEngine.setMusicMuted(musicMuted);
+    if (nextSettings.musicVolume !== undefined) SoundEngine.setMusicVolume(nextSettings.musicVolume);
+    if (nextSettings.sfxVolume !== undefined) SoundEngine.setSfxVolume(nextSettings.sfxVolume);
+    if (nextSettings.musicStyle) SoundEngine.setMusicStyle(nextSettings.musicStyle);
+
     setShowFpsCounter(nextSettings.showFpsCounter);
     setParticleDensity(nextSettings.particleDensity);
 
@@ -1122,6 +1157,7 @@ export default function App() {
         useWolves={params.useWolves}
         crtEnabled={crtEnabled}
         isMuted={isMuted}
+        isMusicMuted={isMusicMuted}
         theme={theme}
         fps={fps}
         showFpsCounter={showFpsCounter}
@@ -1135,6 +1171,15 @@ export default function App() {
           const nextMute = SoundEngine.toggleMute();
           setIsMuted(nextMute);
           setUiSettings((prev) => ({ ...prev, soundEnabled: !nextMute }));
+        }}
+        onToggleMusic={() => {
+          const nextMusicMuted = SoundEngine.toggleMusic();
+          setIsMusicMuted(nextMusicMuted);
+          setUiSettings((prev) => {
+            const next = { ...prev, musicEnabled: !nextMusicMuted };
+            if (prev.autoSaveOnChange) saveUISettings(next);
+            return next;
+          });
         }}
         onChangeTheme={(th) => {
           setTheme(th);

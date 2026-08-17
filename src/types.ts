@@ -190,6 +190,8 @@ export interface EcosystemTool {
   isBuiltin?: boolean;
 }
 
+export type AmbientMusicStyle = 'meadow' | 'zen' | 'ethereal';
+
 export interface UISettings {
   defaultTheme: ColorTheme;
   defaultViewMode: PlotViewMode;
@@ -197,6 +199,10 @@ export interface UISettings {
   defaultTimeSpeed: number;
   crtEnabled: boolean;
   soundEnabled: boolean;
+  musicEnabled?: boolean;
+  musicVolume?: number;
+  sfxVolume?: number;
+  musicStyle?: AmbientMusicStyle;
   showFpsCounter: boolean;
   particleDensity: ParticleDensity;
   autoSaveOnChange: boolean;

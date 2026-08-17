@@ -131,12 +131,16 @@ export const DEFAULT_ECOSYSTEM_TOOLS: EcosystemTool[] = [
 ];
 
 export const DEFAULT_UI_SETTINGS: UISettings = {
-  defaultTheme: 'phosphor-green',
+  defaultTheme: 'light-lab',
   defaultViewMode: 'visual_chart',
   defaultGridRenderMode: 'graphic',
   defaultTimeSpeed: 1,
-  crtEnabled: true,
+  crtEnabled: false,
   soundEnabled: true,
+  musicEnabled: true,
+  musicVolume: 0.35,
+  sfxVolume: 0.3,
+  musicStyle: 'meadow',
   showFpsCounter: true,
   particleDensity: 'high',
   autoSaveOnChange: true,

@@ -332,17 +332,25 @@ export const VisualChart: React.FC<VisualChartProps> = ({
 
         {/* Time window selector & export */}
         <div className="flex items-center gap-1.5">
-          <div className="flex items-center rounded border border-zinc-700 bg-zinc-900/60 p-0.5 text-[11px]">
+          <div
+            className={`flex items-center rounded border p-0.5 text-[11px] transition-colors ${
+              isLightMode
+                ? 'border-slate-300 bg-slate-100 shadow-xs'
+                : 'border-zinc-700 bg-zinc-900/60'
+            }`}
+          >
             <button
               onClick={() => {
                 setTimeWindow('30');
               }}
-              className={`px-1.5 py-0.5 rounded cursor-pointer transition ${
+              className={`px-2 py-0.5 rounded cursor-pointer transition ${
                 timeWindow === '30'
-                  ? 'bg-emerald-600 text-white font-bold'
+                  ? isLightMode
+                    ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                    : 'bg-emerald-600 text-white font-bold'
                   : isLightMode
-                  ? 'text-slate-600 hover:text-slate-900'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/80'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
               }`}
             >
               30d
@@ -351,12 +359,14 @@ export const VisualChart: React.FC<VisualChartProps> = ({
               onClick={() => {
                 setTimeWindow('60');
               }}
-              className={`px-1.5 py-0.5 rounded cursor-pointer transition ${
+              className={`px-2 py-0.5 rounded cursor-pointer transition ${
                 timeWindow === '60'
-                  ? 'bg-emerald-600 text-white font-bold'
+                  ? isLightMode
+                    ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                    : 'bg-emerald-600 text-white font-bold'
                   : isLightMode
-                  ? 'text-slate-600 hover:text-slate-900'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/80'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
               }`}
             >
               60d
@@ -365,12 +375,14 @@ export const VisualChart: React.FC<VisualChartProps> = ({
               onClick={() => {
                 setTimeWindow('120');
               }}
-              className={`px-1.5 py-0.5 rounded cursor-pointer transition ${
+              className={`px-2 py-0.5 rounded cursor-pointer transition ${
                 timeWindow === '120'
-                  ? 'bg-emerald-600 text-white font-bold'
+                  ? isLightMode
+                    ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                    : 'bg-emerald-600 text-white font-bold'
                   : isLightMode
-                  ? 'text-slate-600 hover:text-slate-900'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/80'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
               }`}
             >
               120d
@@ -380,12 +392,14 @@ export const VisualChart: React.FC<VisualChartProps> = ({
                 setTimeWindow('all');
                 setWindowEndDay(null);
               }}
-              className={`px-1.5 py-0.5 rounded cursor-pointer transition ${
+              className={`px-2 py-0.5 rounded cursor-pointer transition ${
                 timeWindow === 'all'
-                  ? 'bg-emerald-600 text-white font-bold'
+                  ? isLightMode
+                    ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                    : 'bg-emerald-600 text-white font-bold'
                   : isLightMode
-                  ? 'text-slate-600 hover:text-slate-900'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/80'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
               }`}
             >
               All

@@ -9,6 +9,7 @@ import { SoundEngine } from '../utils/soundSynthesizer';
 import {
   Volume2,
   VolumeX,
+  Music,
   Tv,
   HelpCircle,
   Trophy,
@@ -36,6 +37,7 @@ interface TerminalHeaderProps {
   useWolves: boolean;
   crtEnabled: boolean;
   isMuted: boolean;
+  isMusicMuted?: boolean;
   theme: ColorTheme;
   fps: number;
   showFpsCounter?: boolean;
@@ -46,6 +48,7 @@ interface TerminalHeaderProps {
   onReset: () => void;
   onToggleCrt: () => void;
   onToggleMute: () => void;
+  onToggleMusic?: () => void;
   onChangeTheme: (theme: ColorTheme) => void;
   onToggleLightDark: () => void;
   onOpenChallenges: () => void;
@@ -66,6 +69,7 @@ export const TerminalHeader: React.FC<TerminalHeaderProps> = ({
   useWolves,
   crtEnabled,
   isMuted,
+  isMusicMuted = false,
   theme,
   fps,
   showFpsCounter = true,
@@ -76,6 +80,7 @@ export const TerminalHeader: React.FC<TerminalHeaderProps> = ({
   onReset,
   onToggleCrt,
   onToggleMute,
+  onToggleMusic,
   onChangeTheme,
   onToggleLightDark,
   onOpenChallenges,
@@ -234,7 +239,33 @@ export const TerminalHeader: React.FC<TerminalHeaderProps> = ({
             </button>
           )}
 
-          {/* Audio toggle */}
+          {/* Ambient Music Toggle */}
+          {onToggleMusic && (
+            <button
+              onClick={() => {
+                SoundEngine.playClick();
+                onToggleMusic();
+              }}
+              className={`p-1 rounded border transition cursor-pointer flex items-center gap-1 ${
+                !isMusicMuted && !isMuted
+                  ? isLightMode
+                    ? 'bg-emerald-100 border-emerald-400 text-emerald-800 shadow-xs'
+                    : 'bg-emerald-950/80 border-emerald-500 text-emerald-400'
+                  : isLightMode
+                  ? 'bg-slate-100 border-slate-300 text-slate-400 hover:text-slate-700'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
+              }`}
+              title={
+                !isMusicMuted && !isMuted
+                  ? 'Ambient Nature Music: Playing (Click to Mute)'
+                  : 'Ambient Nature Music: Muted (Click to Play)'
+              }
+            >
+              <Music className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* Sound Effects toggle */}
           <button
             onClick={() => {
               SoundEngine.playClick();
@@ -243,13 +274,13 @@ export const TerminalHeader: React.FC<TerminalHeaderProps> = ({
             className={`p-1 rounded border transition cursor-pointer ${
               !isMuted
                 ? isLightMode
-                  ? 'bg-emerald-100 border-emerald-400 text-emerald-800'
+                  ? 'bg-emerald-100 border-emerald-400 text-emerald-800 shadow-xs'
                   : 'bg-emerald-950/80 border-emerald-500 text-emerald-400'
                 : isLightMode
-                ? 'bg-slate-100 border-slate-300 text-slate-400'
+                ? 'bg-slate-100 border-slate-300 text-slate-400 hover:text-slate-700'
                 : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
             }`}
-            title="Toggle 8-Bit Synthesizer Audio"
+            title={!isMuted ? 'Sound Effects: Active (Click to Mute)' : 'Sound Effects: Muted (Click to Enable)'}
           >
             {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
           </button>
