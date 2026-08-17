@@ -263,5 +263,134 @@ export const SoundEngine = {
     } catch {
       // ignore
     }
+  },
+
+  // Hunter Rifle / Ranger Shot SFX (Predator of predators)
+  playHunterShot() {
+    if (isMuted) return;
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+
+      // 1. Noise burst (Gunshot crack)
+      const bufferSize = ctx.sampleRate * 0.08;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.2));
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.2, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+      noise.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+      noise.start(now);
+
+      // 2. Low boom body
+      const osc = ctx.createOscillator();
+      const oscGain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(45, now + 0.15);
+
+      oscGain.gain.setValueAtTime(0.18, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+      osc.connect(oscGain);
+      oscGain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.15);
+    } catch {
+      // ignore
+    }
+  },
+
+  // Apex Eagle screech / Aerial swoop
+  playEagleScreech() {
+    if (isMuted) return;
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(900, now);
+      osc.frequency.linearRampToValueAtTime(1600, now + 0.08);
+      osc.frequency.exponentialRampToValueAtTime(400, now + 0.25);
+
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } catch {
+      // ignore
+    }
+  },
+
+  // Predator Trap Snap / Metallic trigger
+  playTrapSnap() {
+    if (isMuted) return;
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.setValueAtTime(180, now + 0.02);
+      osc.frequency.setValueAtTime(80, now + 0.05);
+
+      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.09);
+    } catch {
+      // ignore
+    }
+  },
+
+  // Bio-Vaccine / Cure Sparkle
+  playCureSparkle() {
+    if (isMuted) return;
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const freqs = [587.33, 739.99, 880, 1174.66]; // D5, F#5, A5, D6
+      freqs.forEach((f, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const start = ctx.currentTime + idx * 0.04;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, start);
+        gain.gain.setValueAtTime(0.06, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.12);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.12);
+      });
+    } catch {
+      // ignore
+    }
   }
 };

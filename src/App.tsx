@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ChallengePreset,
   ColorTheme,
+  EcosystemTool,
   GameMode,
   GridAgent,
   GridRenderMode,
@@ -76,6 +77,9 @@ export default function App() {
   const [particleDensity, setParticleDensity] = useState<ParticleDensity>(initialSettings.particleDensity || 'high');
   const [hasDisease, setHasDisease] = useState<boolean>(false);
   const [diseaseTimer, setDiseaseTimer] = useState<number>(0);
+  const [selectedToolId, setSelectedToolId] = useState<string>(
+    initialSettings.defaultSelectedToolId || 'tool-rabbit'
+  );
 
   // Derive light mode flag
   const isLightMode = theme.startsWith('light-');
@@ -466,7 +470,278 @@ export default function App() {
     }
   };
 
-  // Interactive Grid Spawn Agent
+  // Interactive Grid Tool Trigger Handler (Supports Apex Predator Hunters, Traps, Raptor, Vaccine, and Custom Tools)
+  const handleTriggerTool = (tool: EcosystemTool, x: number, y: number) => {
+    const curDay = day;
+    const { alphaT, season } = calculateSeasonality(
+      curDay,
+      params.alpha,
+      params.useSeasonality,
+      params.seasonalityA,
+      params.seasonalityPeriod
+    );
+
+    if (tool.actionType === 'hunt_predators') {
+      // Apex Hunter / Ranger intervention (Predators of predators)
+      SoundEngine.playHunterShot();
+      const potency = tool.potency || 3;
+      let culledFoxes = 0;
+      let culledWolves = 0;
+
+      if (tool.targetSpecies === 'wolves') {
+        culledWolves = Math.min(wolves, potency);
+        setWolves((w) => Math.max(0, w - culledWolves));
+      } else if (tool.targetSpecies === 'foxes') {
+        culledFoxes = Math.min(foxes, potency);
+        setFoxes((f) => Math.max(0, f - culledFoxes));
+      } else {
+        // Cull both foxes and wolves proportionally
+        const half = Math.ceil(potency / 2);
+        culledFoxes = Math.min(foxes, half);
+        culledWolves = Math.min(wolves, potency - culledFoxes);
+        setFoxes((f) => Math.max(0, f - culledFoxes));
+        setWolves((w) => Math.max(0, w - culledWolves));
+      }
+
+      const totalCulled = culledFoxes + culledWolves;
+
+      // Add gunshot crosshair and splatter sparks
+      setParticles((prev) => [
+        ...prev,
+        {
+          id: `hunter-crosshair-${Date.now()}`,
+          x,
+          y,
+          char: '🎯',
+          color: '#ef4444',
+          life: 14,
+          maxLife: 14,
+          vx: 0,
+          vy: -0.1,
+          type: 'splatter',
+        },
+        {
+          id: `hunter-spark-${Date.now()}`,
+          x: Math.max(0, Math.min(41, x + (Math.random() - 0.5) * 2)),
+          y: Math.max(0, Math.min(17, y + (Math.random() - 0.5) * 2)),
+          char: '💥',
+          color: '#fbbf24',
+          life: 10,
+          maxLife: 10,
+          vx: 0,
+          vy: 0,
+          type: 'splatter',
+        },
+      ]);
+
+      addEventLog(
+        `🎯 ${tool.name} intervened: culled ${totalCulled} apex predator${totalCulled === 1 ? '' : 's'} (${culledFoxes}🦊, ${culledWolves}🐺) to prevent trophic collapse.`,
+        'predation'
+      );
+
+      // Create timeline event marker
+      const marker: TimelineEventMarker = {
+        id: `marker-hunter-${Date.now()}`,
+        t: curDay,
+        day: Math.floor(curDay),
+        type: 'hunt_predators',
+        label: `${tool.name} Cull`,
+        icon: tool.emoji || '🎯',
+        description: `Culled ${totalCulled} predator(s) to stabilize trophic cascade.`,
+        color: '#ef4444',
+      };
+      setHistory((prev) => [
+        ...prev.slice(-3000),
+        {
+          t: curDay,
+          day: Math.floor(curDay),
+          rabbits: Math.round(rabbits),
+          foxes: Math.round(Math.max(0, foxes - culledFoxes)),
+          wolves: Math.round(Math.max(0, wolves - culledWolves)),
+          alphaT,
+          season,
+          eventMarker: marker.icon,
+          eventDetails: marker,
+        },
+      ]);
+    } else if (tool.actionType === 'apex_predator') {
+      // Apex Raptor / Eagle Strike
+      SoundEngine.playEagleScreech();
+      const potency = tool.potency || 2;
+      const culledF = Math.min(foxes, potency);
+      setFoxes((f) => Math.max(0, f - culledF));
+      setParticles((prev) => [
+        ...prev,
+        {
+          id: `eagle-${Date.now()}`,
+          x,
+          y,
+          char: '🦅',
+          color: '#06b6d4',
+          life: 16,
+          maxLife: 16,
+          vx: 0.2,
+          vy: -0.3,
+          type: 'splatter',
+        },
+      ]);
+      addEventLog(`🦅 ${tool.name} swooped in and predated ${culledF} fox(es)!`, 'predation');
+    } else if (tool.actionType === 'predator_trap') {
+      // Predator Trap
+      SoundEngine.playTrapSnap();
+      const potency = tool.potency || 2;
+      const trapped = Math.min(foxes, potency);
+      setFoxes((f) => Math.max(0, f - trapped));
+      setParticles((prev) => [
+        ...prev,
+        {
+          id: `trap-${Date.now()}`,
+          x,
+          y,
+          char: '🪤',
+          color: '#d97706',
+          life: 14,
+          maxLife: 14,
+          vx: 0,
+          vy: 0,
+          type: 'splatter',
+        },
+      ]);
+      addEventLog(`🪤 ${tool.name} captured and relocated ${trapped} predator(s).`, 'info');
+    } else if (tool.actionType === 'bio_vaccine') {
+      // Bio Vaccine
+      SoundEngine.playCureSparkle();
+      setHasDisease(false);
+      setRabbits((r) => r + (tool.potency || 4));
+      setParticles((prev) => [
+        ...prev,
+        {
+          id: `cure-${Date.now()}`,
+          x,
+          y,
+          char: '✨',
+          color: '#a855f7',
+          life: 14,
+          maxLife: 14,
+          vx: 0,
+          vy: -0.2,
+          type: 'birth',
+        },
+      ]);
+      addEventLog(`💉 ${tool.name} deployed: eradicated virulent pathogen and cured rabbit population!`, 'success');
+    } else if (tool.actionType === 'feed_prey') {
+      // Feed Prey / Carrots
+      SoundEngine.playBirth();
+      const potency = tool.potency || 3;
+      setRabbits((r) => r + potency);
+      setParticles((prev) => [
+        ...prev,
+        {
+          id: `feed-${Date.now()}`,
+          x,
+          y,
+          char: tool.emoji === '🌿' ? '🌿' : '🥕',
+          color: tool.color || '#f59e0b',
+          life: 12,
+          maxLife: 12,
+          vx: 0,
+          vy: -0.2,
+          type: 'carrots',
+        },
+      ]);
+      addEventLog(`${tool.emoji} ${tool.name} forage dropped (+${potency} rabbits).`, 'birth');
+    } else if (tool.actionType === 'spawn_agent') {
+      if (tool.targetSpecies === 'rabbits') {
+        setRabbits((r) => r + (tool.potency || 4));
+        SoundEngine.playBirth();
+      } else if (tool.targetSpecies === 'foxes') {
+        setFoxes((f) => f + (tool.potency || 2));
+        SoundEngine.playPredation();
+      } else if (tool.targetSpecies === 'wolves') {
+        setParams((p) => ({ ...p, useWolves: true }));
+        setWolves((w) => w + (tool.potency || 2));
+        SoundEngine.playWolfHowl();
+      }
+      setParticles((prev) => [
+        ...prev,
+        {
+          id: `spawn-${Date.now()}`,
+          x,
+          y,
+          char: tool.emoji,
+          color: tool.color || '#10b981',
+          life: 12,
+          maxLife: 12,
+          vx: 0,
+          vy: -0.2,
+          type: 'birth',
+        },
+      ]);
+    } else if (tool.actionType === 'custom_cull') {
+      SoundEngine.playHunterShot();
+      const potency = tool.potency || 2;
+      if (tool.targetSpecies === 'predators') {
+        const cF = Math.min(foxes, Math.ceil(potency / 2));
+        const cW = Math.min(wolves, potency - cF);
+        setFoxes((f) => Math.max(0, f - cF));
+        setWolves((w) => Math.max(0, w - cW));
+        addEventLog(`${tool.emoji} ${tool.name}: culled ${cF + cW} predator(s).`, 'predation');
+      } else if (tool.targetSpecies === 'foxes') {
+        setFoxes((f) => Math.max(0, f - Math.min(foxes, potency)));
+        addEventLog(`${tool.emoji} ${tool.name}: culled ${Math.min(foxes, potency)} fox(es).`, 'predation');
+      } else if (tool.targetSpecies === 'wolves') {
+        setWolves((w) => Math.max(0, w - Math.min(wolves, potency)));
+        addEventLog(`${tool.emoji} ${tool.name}: culled ${Math.min(wolves, potency)} wolf/wolves.`, 'predation');
+      } else if (tool.targetSpecies === 'rabbits') {
+        setRabbits((r) => Math.max(0, r - Math.min(rabbits, potency)));
+        addEventLog(`${tool.emoji} ${tool.name}: culled ${Math.min(rabbits, potency)} rabbit(s).`, 'info');
+      }
+      setParticles((prev) => [
+        ...prev,
+        {
+          id: `cull-${Date.now()}`,
+          x,
+          y,
+          char: tool.emoji,
+          color: tool.color || '#ef4444',
+          life: 14,
+          maxLife: 14,
+          vx: 0,
+          vy: -0.2,
+          type: 'splatter',
+        },
+      ]);
+    } else if (tool.actionType === 'custom_boost') {
+      SoundEngine.playBirth();
+      const potency = tool.potency || 3;
+      if (tool.targetSpecies === 'rabbits') {
+        setRabbits((r) => r + potency);
+      } else if (tool.targetSpecies === 'foxes') {
+        setFoxes((f) => f + potency);
+      } else if (tool.targetSpecies === 'wolves') {
+        setParams((p) => ({ ...p, useWolves: true }));
+        setWolves((w) => w + potency);
+      }
+      setParticles((prev) => [
+        ...prev,
+        {
+          id: `boost-${Date.now()}`,
+          x,
+          y,
+          char: tool.emoji,
+          color: tool.color || '#10b981',
+          life: 14,
+          maxLife: 14,
+          vx: 0,
+          vy: -0.2,
+          type: 'birth',
+        },
+      ]);
+      addEventLog(`${tool.emoji} ${tool.name} deployed (+${potency} ${tool.targetSpecies}).`, 'birth');
+    }
+  };
+
+  // Interactive Grid Spawn Agent (Legacy fallback)
   const handleSpawnAgent = (type: Species, x: number, y: number) => {
     if (type === 'rabbit') {
       setRabbits((r) => r + 4);
@@ -481,7 +756,7 @@ export default function App() {
     }
   };
 
-  // Interactive Grid Drop Carrots
+  // Interactive Grid Drop Carrots (Legacy fallback)
   const handleDropCarrots = (x: number, y: number) => {
     SoundEngine.playBirth();
     setRabbits((r) => r + 3);
@@ -899,6 +1174,11 @@ export default function App() {
                 return next;
               });
             }}
+            tools={uiSettings.tools}
+            selectedToolId={selectedToolId}
+            onSelectToolId={setSelectedToolId}
+            onTriggerTool={handleTriggerTool}
+            onOpenSettings={() => setIsSettingsOpen(true)}
             onSpawnAgent={handleSpawnAgent}
             onDropCarrots={handleDropCarrots}
           />

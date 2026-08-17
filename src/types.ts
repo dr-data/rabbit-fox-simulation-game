@@ -70,6 +70,12 @@ export type EventMarkerType =
   | 'add_wolves' 
   | 'cull_rabbits' 
   | 'hunt_foxes' 
+  | 'hunt_predators'
+  | 'apex_predator'
+  | 'predator_trap'
+  | 'bio_vaccine'
+  | 'custom_tool'
+  | 'relief'
   | 'random_shock';
 
 export interface TimelineEventMarker {
@@ -159,6 +165,31 @@ export type GridRenderMode = 'graphic' | 'ascii';
 
 export type ParticleDensity = 'high' | 'medium' | 'low';
 
+export type ToolActionType =
+  | 'spawn_agent'
+  | 'feed_prey'
+  | 'hunt_predators'
+  | 'apex_predator'
+  | 'predator_trap'
+  | 'bio_vaccine'
+  | 'custom_cull'
+  | 'custom_boost';
+
+export interface EcosystemTool {
+  id: string;
+  name: string;
+  emoji: string;
+  category: 'spawn' | 'predator_control' | 'prey_support' | 'environment';
+  description: string;
+  actionType: ToolActionType;
+  targetSpecies: 'predators' | 'foxes' | 'wolves' | 'rabbits' | 'all' | 'disease';
+  potency: number;
+  radius?: number;
+  color: string;
+  enabled: boolean;
+  isBuiltin?: boolean;
+}
+
 export interface UISettings {
   defaultTheme: ColorTheme;
   defaultViewMode: PlotViewMode;
@@ -169,4 +200,6 @@ export interface UISettings {
   showFpsCounter: boolean;
   particleDensity: ParticleDensity;
   autoSaveOnChange: boolean;
+  tools: EcosystemTool[];
+  defaultSelectedToolId?: string;
 }

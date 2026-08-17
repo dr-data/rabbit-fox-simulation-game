@@ -4,9 +4,9 @@
  */
 
 import React, { useState } from 'react';
-import { GridAgent, GridRenderMode, Particle, Season, Species } from '../types';
+import { EcosystemTool, GridAgent, GridRenderMode, Particle, Season, Species } from '../types';
 import { SoundEngine } from '../utils/soundSynthesizer';
-import { Sparkles, Skull, Crosshair, Grid, Monitor, Eye } from 'lucide-react';
+import { Sparkles, Skull, Crosshair, Grid, Monitor, Eye, Wrench, Settings } from 'lucide-react';
 
 interface EcosystemGridProps {
   agents: GridAgent[];
@@ -21,8 +21,13 @@ interface EcosystemGridProps {
   isLightMode?: boolean;
   renderMode: GridRenderMode;
   onChangeRenderMode: (mode: GridRenderMode) => void;
-  onSpawnAgent: (type: Species, x: number, y: number) => void;
-  onDropCarrots: (x: number, y: number) => void;
+  tools?: EcosystemTool[];
+  selectedToolId?: string;
+  onSelectToolId?: (id: string) => void;
+  onTriggerTool?: (tool: EcosystemTool, x: number, y: number) => void;
+  onOpenSettings?: () => void;
+  onSpawnAgent?: (type: Species, x: number, y: number) => void;
+  onDropCarrots?: (x: number, y: number) => void;
 }
 
 export const EcosystemGrid: React.FC<EcosystemGridProps> = ({
@@ -38,10 +43,41 @@ export const EcosystemGrid: React.FC<EcosystemGridProps> = ({
   isLightMode = false,
   renderMode,
   onChangeRenderMode,
+  tools = [],
+  selectedToolId,
+  onSelectToolId,
+  onTriggerTool,
+  onOpenSettings,
   onSpawnAgent,
   onDropCarrots,
 }) => {
-  const [selectedTool, setSelectedTool] = useState<'rabbit' | 'fox' | 'wolf' | 'carrots'>('rabbit');
+  // Local fallback tool selection if not externally controlled
+  const [localToolId, setLocalToolId] = useState<string>('tool-rabbit');
+  const activeToolId = selectedToolId || localToolId;
+
+  // Filter enabled tools (or default fallback)
+  const enabledTools = tools.filter((t) => t.enabled);
+  const activeTool = tools.find((t) => t.id === activeToolId) || enabledTools[0] || {
+    id: 'tool-rabbit',
+    name: 'Rabbit',
+    emoji: '🐰',
+    category: 'spawn',
+    description: 'Spawn rabbits',
+    actionType: 'spawn_agent',
+    targetSpecies: 'rabbits',
+    potency: 4,
+    color: '#10b981',
+    enabled: true,
+  };
+
+  const handleSelectTool = (id: string) => {
+    SoundEngine.playClick();
+    if (onSelectToolId) {
+      onSelectToolId(id);
+    } else {
+      setLocalToolId(id);
+    }
+  };
 
   // Build 2D character / tile map
   const charGrid: { char: string; color: string; agentId?: string }[][] = Array.from(
@@ -118,11 +154,18 @@ export const EcosystemGrid: React.FC<EcosystemGridProps> = ({
 
   // Handle cell click
   const handleCellClick = (x: number, y: number) => {
+    if (onTriggerTool && activeTool) {
+      onTriggerTool(activeTool as EcosystemTool, x, y);
+      return;
+    }
+
+    // Fallback legacy support
     SoundEngine.playClick();
-    if (selectedTool === 'carrots') {
-      onDropCarrots(x, y);
-    } else {
-      onSpawnAgent(selectedTool, x, y);
+    if (activeTool.actionType === 'feed_prey') {
+      onDropCarrots?.(x, y);
+    } else if (activeTool.actionType === 'spawn_agent') {
+      const sp = activeTool.targetSpecies === 'wolves' ? 'wolf' : activeTool.targetSpecies === 'foxes' ? 'fox' : 'rabbit';
+      onSpawnAgent?.(sp as Species, x, y);
     }
   };
 
@@ -148,7 +191,7 @@ export const EcosystemGrid: React.FC<EcosystemGridProps> = ({
     >
       {/* Box Header */}
       <div
-        className={`flex flex-wrap items-center justify-between border-b pb-1.5 mb-2 gap-2 ${
+        className={`flex flex-wrap items-center justify-between border-b pb-2 mb-2 gap-2 ${
           isLightMode ? 'border-slate-200' : 'border-emerald-900/40'
         }`}
       >
@@ -191,87 +234,62 @@ export const EcosystemGrid: React.FC<EcosystemGridProps> = ({
           </div>
         </div>
 
-        {/* Interactive God-Tool Bar */}
-        <div className="flex items-center gap-1">
-          <span className="text-zinc-500 text-[11px] mr-1 hidden sm:inline">SPAWN TOOL:</span>
-          <button
-            onClick={() => {
-              SoundEngine.playClick();
-              setSelectedTool('rabbit');
-            }}
-            className={`px-2 py-0.5 rounded text-[11px] font-mono transition cursor-pointer border flex items-center gap-1 ${
-              selectedTool === 'rabbit'
-                ? isLightMode
-                  ? 'bg-emerald-100 text-emerald-800 border-emerald-400 font-bold'
-                  : 'bg-emerald-900/80 border-emerald-400 text-emerald-300 font-bold'
-                : isLightMode
-                ? 'bg-slate-100 text-slate-600 border-slate-200'
-                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-emerald-400'
-            }`}
-          >
-            <span>🐰 Rabbit</span>
-          </button>
+        {/* Dynamic Habitat Tools Bar (Configurable from Settings) */}
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-zinc-500 text-[11px] mr-0.5 hidden sm:inline">TOOL:</span>
+          {enabledTools.map((tool) => {
+            const isSelected = tool.id === activeTool.id;
+            return (
+              <button
+                key={tool.id}
+                onClick={() => handleSelectTool(tool.id)}
+                className={`px-2 py-0.5 rounded text-[11px] font-mono transition cursor-pointer border flex items-center gap-1 ${
+                  isSelected
+                    ? isLightMode
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-400 font-bold shadow-xs'
+                      : 'bg-emerald-900/80 border-emerald-400 text-emerald-300 font-bold shadow-xs'
+                    : isLightMode
+                    ? 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                }`}
+                title={`${tool.emoji} ${tool.name}: ${tool.description}`}
+              >
+                <span>{tool.emoji}</span>
+                <span>{tool.name}</span>
+                {tool.actionType === 'hunt_predators' && (
+                  <span className="text-[9px] text-rose-400 opacity-90 hidden md:inline">
+                    (Apex)
+                  </span>
+                )}
+              </button>
+            );
+          })}
 
-          <button
-            onClick={() => {
-              SoundEngine.playClick();
-              setSelectedTool('fox');
-            }}
-            className={`px-2 py-0.5 rounded text-[11px] font-mono transition cursor-pointer border flex items-center gap-1 ${
-              selectedTool === 'fox'
-                ? isLightMode
-                  ? 'bg-orange-100 text-orange-800 border-orange-400 font-bold'
-                  : 'bg-orange-950/80 border-orange-400 text-orange-300 font-bold'
-                : isLightMode
-                ? 'bg-slate-100 text-slate-600 border-slate-200'
-                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-orange-400'
-            }`}
-          >
-            <span>🦊 Fox</span>
-          </button>
-
-          <button
-            onClick={() => {
-              SoundEngine.playClick();
-              setSelectedTool('wolf');
-            }}
-            className={`px-2 py-0.5 rounded text-[11px] font-mono transition cursor-pointer border flex items-center gap-1 ${
-              selectedTool === 'wolf'
-                ? isLightMode
-                  ? 'bg-rose-100 text-rose-800 border-rose-400 font-bold'
-                  : 'bg-rose-950/80 border-rose-400 text-rose-300 font-bold'
-                : isLightMode
-                ? 'bg-slate-100 text-slate-600 border-slate-200'
-                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-rose-400'
-            }`}
-          >
-            <span>🐺 Wolf</span>
-          </button>
-
-          <button
-            onClick={() => {
-              SoundEngine.playClick();
-              setSelectedTool('carrots');
-            }}
-            className={`px-2 py-0.5 rounded text-[11px] font-mono transition cursor-pointer border flex items-center gap-1 ${
-              selectedTool === 'carrots'
-                ? isLightMode
-                  ? 'bg-amber-100 text-amber-800 border-amber-400 font-bold'
-                  : 'bg-amber-950/80 border-amber-400 text-amber-300 font-bold'
-                : isLightMode
-                ? 'bg-slate-100 text-slate-600 border-slate-200'
-                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-amber-400'
-            }`}
-          >
-            <span>🥕 Carrot</span>
-          </button>
+          {/* Quick Tools Settings Link */}
+          {onOpenSettings && (
+            <button
+              onClick={() => {
+                SoundEngine.playClick();
+                onOpenSettings();
+              }}
+              className={`p-1 rounded text-[10px] font-mono border transition cursor-pointer flex items-center gap-1 ${
+                isLightMode
+                  ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-600'
+                  : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-emerald-400'
+              }`}
+              title="Configure, enable, or add custom tools (e.g. Hunter for predators) in Settings"
+            >
+              <Settings className="w-3 h-3" />
+              <span className="hidden xl:inline">Config</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Grid Canvas Screen (Graphic Mode or ASCII Mode) */}
       <div
         className={`relative rounded border p-2 overflow-hidden cursor-crosshair group flex justify-center items-center select-none transition-colors ${getCanvasBg()}`}
-        title="Click on habitat to deploy selected species or carrots"
+        title={`Click on habitat to deploy ${activeTool.name} (${activeTool.description})`}
       >
         {/* Weather / Disease Overlay effects */}
         {hasDisease && (
@@ -383,11 +401,17 @@ export const EcosystemGrid: React.FC<EcosystemGridProps> = ({
                   className="absolute pointer-events-none transition-opacity duration-150 flex items-center justify-center font-bold text-xs"
                 >
                   {p.type === 'splatter' ? (
-                    <span className="text-rose-500 font-extrabold animate-ping">💥</span>
+                    <span className="text-rose-500 font-extrabold animate-ping">
+                      {p.char || '💥'}
+                    </span>
                   ) : p.type === 'birth' ? (
-                    <span className="text-emerald-400 font-bold animate-pulse">✨</span>
+                    <span className="text-emerald-400 font-bold animate-pulse">
+                      {p.char || '✨'}
+                    </span>
                   ) : p.type === 'carrots' ? (
-                    <span className="text-amber-500 font-bold animate-bounce">🥕</span>
+                    <span className="text-amber-500 font-bold animate-bounce">
+                      {p.char || '🥕'}
+                    </span>
                   ) : p.type === 'snow' ? (
                     <span className="text-cyan-300 font-bold">❄</span>
                   ) : (
@@ -417,13 +441,13 @@ export const EcosystemGrid: React.FC<EcosystemGridProps> = ({
         )}
       </div>
 
-      {/* Bottom Legend and Status */}
+      {/* Bottom Legend, Active Tool Info and Status */}
       <div
         className={`mt-2 pt-1.5 border-t flex flex-wrap items-center justify-between text-[11px] gap-1.5 ${
           isLightMode ? 'border-slate-200 text-slate-600' : 'border-zinc-900 text-zinc-400'
         }`}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span>
             <strong className="text-emerald-500">🐰 Rabbits</strong>: {Math.round(rabbits)}
           </span>
@@ -435,7 +459,9 @@ export const EcosystemGrid: React.FC<EcosystemGridProps> = ({
               <strong className="text-rose-500">🐺 Wolves</strong>: {Math.round(wolves)}
             </span>
           )}
-          <span className="hidden sm:inline text-zinc-500">│ Click to spawn selected species</span>
+          <span className="text-emerald-400 font-medium">
+            Active: {activeTool.emoji} {activeTool.name} — {activeTool.description}
+          </span>
         </div>
         <div className="text-zinc-500 font-mono">
           Living Agents: {agents.length} active
@@ -444,3 +470,4 @@ export const EcosystemGrid: React.FC<EcosystemGridProps> = ({
     </div>
   );
 };
+
