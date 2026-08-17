@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "sources": ["../src/worker.ts"],
+  "sourceRoot": ".wrangler-dist",
+  "sourcesContent": ["export default {\n  async fetch(request, env, ctx) {\n    // Attempt to fetch the static asset. If it fails, fallback to index.html for SPA routing.\n    try {\n      const response = await env.ASSETS.fetch(request);\n      if (response.status === 404) {\n        // SPA fallback\n        const url = new URL(request.url);\n        url.pathname = '/index.html';\n        return env.ASSETS.fetch(new Request(url, request));\n      }\n      return response;\n    } catch (e) {\n      return new Response(\"Internal Error loading assets\", { status: 500 });\n    }\n  },\n};\n"],
+  "mappings": ";AAAA,IAAO,iBAAQ;AAAA,EACb,MAAM,MAAM,SAAS,KAAK,KAAK;AAE7B,QAAI;AACF,YAAM,WAAW,MAAM,IAAI,OAAO,MAAM,OAAO;AAC/C,UAAI,SAAS,WAAW,KAAK;AAE3B,cAAM,MAAM,IAAI,IAAI,QAAQ,GAAG;AAC/B,YAAI,WAAW;AACf,eAAO,IAAI,OAAO,MAAM,IAAI,QAAQ,KAAK,OAAO,CAAC;AAAA,MACnD;AACA,aAAO;AAAA,IACT,SAAS,GAAG;AACV,aAAO,IAAI,SAAS,iCAAiC,EAAE,QAAQ,IAAI,CAAC;AAAA,IACtE;AAAA,EACF;AACF;",
+  "names": []
+}
