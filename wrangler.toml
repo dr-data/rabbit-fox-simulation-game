@@ -1,4 +1,4 @@
 #:schema node_modules/wrangler/config-schema.json
-name = "lotka-volterra-simulator"
+name = "rabbit-fox-simulation-game"
 compatibility_date = "2024-09-23"
 pages_build_output_dir = "dist"
