@@ -23,10 +23,13 @@ export const EventDeck: React.FC<EventDeckProps> = ({
   onClearLog,
   isWolvesActive,
 }) => {
-  const logEndRef = useRef<HTMLDivElement>(null);
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Only scroll the internal log container without scrolling the window or visualizer view
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
   }, [events.length]);
 
   const handleTrigger = (eventType: string) => {
@@ -234,6 +237,7 @@ export const EventDeck: React.FC<EventDeckProps> = ({
         </div>
 
         <div
+          ref={logContainerRef}
           className={`rounded border p-2 h-[95px] overflow-y-auto font-mono text-[11px] space-y-1 ${
             isLightMode ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-black/90 border-zinc-900 text-zinc-300'
           }`}
@@ -256,7 +260,6 @@ export const EventDeck: React.FC<EventDeckProps> = ({
               </div>
             ))
           )}
-          <div ref={logEndRef} />
         </div>
       </div>
     </div>
